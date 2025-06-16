@@ -1,0 +1,58 @@
+<html>
+<head>
+    <script src="popup.js"></script>
+    <link href="bootstrap/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="bootstrap/dist/js/bootstrap.bundle.js"></script>
+    <style>
+        tr {
+            border-bottom: 1px solid #ddd;
+        }
+
+        body {
+            min-width: 800px;
+        }
+
+        table {
+            width: 100%;
+        }
+    </style>
+</head>
+
+<body>
+<div id="outOfDate" class="d-none container h1">Lists are out of date, please open a MJ page to start.</div>
+<!--<div id="locationDropdown" class="d-none d-flex flex-column flex-md-row p-4 gap-4 py-md-5 align-items-center justify-content-center">-->
+<!--    Select a location to begin:-->
+<!--    <div class="dropdown">-->
+<!--        <button class="btn btn-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">-->
+<!--            Dropdown button-->
+<!--        </button>-->
+<!--        <ul class="dropdown-menu">-->
+<!--            <li><a class="dropdown-item" href="#">Lawrenceville</a></li>-->
+<!--            <li><a class="dropdown-item" href="#">Montgomeryville</a></li>-->
+<!--            <li><a class="dropdown-item" href="#">Something else here</a></li>-->
+<!--        </ul>-->
+<!--    </div>-->
+<!--</div>-->
+<div id="no-facility-set" class="d-none container display-6 m-3 text-center"><div class="container"><b>MJFreeway Not Found</b></div><div class="container small display-6"><small>Please open a new <a href="https://app.mjplatform.com/login">MJ page</a> or login to MJ again</small></div></div>
+<div id="stats" class="d-none container-fluid m-2 text-center">
+    <div class="row my-2 align-content-center ">
+        <div id="date-div" class="col me-auto container d-inline align-self-center align-middle text-center"></div>
+        <div id="view-certed" class="col me-auto container-fluid d-inline justify-content-end">
+            <button id="view-certed-toggle-button" type="button" class="align-middle btn btn-link link-secondary btn-sm">View Certed ></button>
+        </div>
+    </div>
+    <div id="totals-header" class="row d-none container-fluid border-bottom small text-center">
+            <div id="facility-div" class="col">
+                Column1
+            </div>
+            <div id="seen-div" class="col">
+                Column2
+            </div>
+            <div id="certed-div" class="col">
+                Column3
+            </div>
+    </div>
+</div>
+<div id="table-container" class="d-none container-fluid mt-0"></div>
+</body>
+</html>

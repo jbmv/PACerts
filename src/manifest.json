@@ -1,0 +1,33 @@
+{
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [ {
+    "js": [ "contentScript.js" ],
+    "matches": [ "https://*.mjplatform.com/*", "https://*.padohmmp.custhelp.com/*" ],
+    "run_at": "document_start"
+  } ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self';"
+  },
+  "description": "Maintains a list of patients and their certification status for PA MMJ pharmacists",
+  "externally_connectable": {
+    "matches": [ "*://app.mjplatform.com/*" ]
+  },
+  "host_permissions": [ "https://*.mjplatform.com/*", "https://*.padohmmp.custhelp.com/*" ],
+  "incognito": "split",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAk4nGbV3YbhmvzH1SAZIlRseGjRp/eJmyWsCvxxaL1iLg6ZUpfD6UJz3NT4I/U1DgYNi8KK6qq6VVxyiC6rwpBOlp4yDzMQANp0/4Lq/83mxHnRTLzn5IX4Js4bJqoaFjYmADrjnaH2PsDs2LFOKWPZ6BPW2S9FIhKhUmT+tNzDS5XNhwl7yAyoJI+DcBEMRQJQAGmhBdpdDJ09pYDJHihmFwoZN5O45pDptsx4NrxUsFdSJq3uycSd0Jp5P5Ksc85g75HZl7BvG6pXAHibhZ9lO1OzBVAU+16FH0FCunQ+GqOAh8mO+ytC9PrfrpoicULLTc2JSFRQKNQh2AjtnTcQIDAQAB",
+  "manifest_version": 3,
+  "name": "PACerts",
+  "options_page": "options.html",
+  "permissions": [ "activeTab", "storage", "unlimitedStorage", "tabs", "webRequest", "clipboardWrite" ],
+  "update_url": "https://clients2.google.com/service/update2/crx",
+  "version": "1.1",
+  "web_accessible_resources": [ {
+    "matches": [ "*://app.mjplatform.com/*", "*://padohmmp.custhelp.com/*" ],
+    "resources": [ "injectMJ.js", "injectDOH.js", "DOHbanner.html" ]
+  } ]
+}
