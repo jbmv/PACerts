@@ -5,11 +5,10 @@
   "background": {
     "service_worker": "background.js"
   },
-  "content_scripts": [ {
-    "js": [ "contentScript.js" ],
-    "matches": [ "https://*.mjplatform.com/*", "https://*.padohmmp.custhelp.com/*" ],
-    "run_at": "document_start"
-  } ],
+  "content_scripts": [
+    {"js": ["contentScriptMJ.js"], "matches": ["https://*.mjplatform.com/*"], "run_at": "document_start"},
+    {"js": ["contentScriptDOH.js"], "matches": ["https://*.padohmmp.custhelp.com/*"], "run_at": "document_start"}
+  ],
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self';"
   },
