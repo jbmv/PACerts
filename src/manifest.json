@@ -6,8 +6,17 @@
     "service_worker": "background.js"
   },
   "content_scripts": [
-    {"js": ["contentScriptMJ.js"], "matches": ["https://*.mjplatform.com/*"], "run_at": "document_start"},
-    {"js": ["contentScriptDOH.js"], "matches": ["https://*.padohmmp.custhelp.com/*"], "run_at": "document_start"}
+    {
+      "matches": ["https://*.mjplatform.com/*"],
+      "js": ["contentScriptMJ.js"],
+      "run_at": "document_start"
+    },
+    {
+      "matches": ["https://*.padohmmp.custhelp.com/*"],
+      "js": ["contentScriptDOH.js"],
+      "css": ["stylesDOH.css"],
+      "run_at": "document_start"
+    }
   ],
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self';"
@@ -25,8 +34,14 @@
   "permissions": [ "activeTab", "storage", "unlimitedStorage", "tabs", "webRequest", "clipboardWrite" ],
   "update_url": "https://clients2.google.com/service/update2/crx",
   "version": "1.1",
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
   "web_accessible_resources": [ {
     "matches": [ "*://app.mjplatform.com/*", "*://padohmmp.custhelp.com/*" ],
-    "resources": [ "injectMJ.js", "injectDOH.js", "DOHbanner.html" ]
+    "resources": [ "injectMJ.js", "injectDOH.js", "DOHbanner.html", "stylesDOH.css" ]
   } ]
 }
