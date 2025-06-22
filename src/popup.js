@@ -1,273 +1,216 @@
-const facilityIDToFacilityNameLUT = {
-    '1238': 'Lawrenceville',
-    '2641': 'Montgomeryville'
-}
-let allPatientData = {};
-let patientsSeen = [];
-let patientsCerted = [];
-let facilityID = '';
-let date = new Date();
-let viewCerted = false;
-const isIncognitoMode = chrome.extension.inIncognitoContext;
-const stateKey = isIncognitoMode ? 'state-incognito' : 'state';
-const facilityIDKey = isIncognitoMode ? 'facilityID-incognito' : 'facilityID';
-document.addEventListener('DOMContentLoaded', function () {
+
+
+
+document.addEventListener("DOMContentLoaded", function(e) {
+    // wrapper function to make await/async calls after DOM loaded
     main();
-})
-async function main() {
-    await chrome.runtime.sendMessage({message: 'wakeup'}, function (response) {
-        if (chrome.runtime.lastError) {
-            console.log('wakeup sent from contentscript: ', chrome.runtime.lastError.message);
-        } else if (response) {
-            console.info("wakeup heard: ", response);
+    async function main() {
+        // wake up background service worker in case it was asleep
+        await chrome.runtime.sendMessage({message: 'wakeup'}, function (response) {
+            if (chrome.runtime.lastError) {
+                // no need to warn, just sending wakeup in case it's inactive
+                console.log('wakeup not received by background.js ', chrome.runtime.lastError.message);
+            } else if (response) {
+                console.info('wakeup sent: ', response);
+            }
+        });
+        // check if incognito mode and set stateKey and facilityIDKey for use in loading local storage keys
+        const isIncognitoMode = chrome.extension.inIncognitoContext;
+        const stateKey = isIncognitoMode ? 'state-incognito' : 'state';
+        const facilityIDKey = isIncognitoMode ? 'facilityID-incognito' : 'facilityID';
+        let state = await chrome.storage.local.get([stateKey]);
+        // format page depending on state of extention
+        switch (state[stateKey]) {
+            case 'initializing':
+                extensionNotInitialized();
+                break;
+            case 'running':
+                await formatPage();
+                break;
+            default:
+                extensionNotInitialized();
+                break;
         }
-    });
-    let state = await chrome.storage.local.get([stateKey]);
-    switch (state[stateKey]) {
-        case 'initializing': noFacilitySet(); break;
-        case 'running': await loadData(); break;
-        default: noFacilitySet(); break; //state invalid
-    }
-}
-function noFacilitySet() {
-    document.getElementById('no-facility-set').classList.remove('d-none');
-    // const dropdownItems = document.querySelectorAll('.dropdown-item');
-    // dropdownItems.forEach(item => {
-    //     item.addEventListener('click', function(e) {
-    //         e.preventDefault(); // Prevent the default link behavior
-    //         const location = this.textContent; // Get the text of the selected item
-    //         // Do something with the selected value
-    //         console.log("Selected: " + location);
-    //         chrome.runtime.sendMessage({
-    //             'messageSender': 'initializeExtension',
-    //             'location': location
-    //         });
-    //         // Update the dropdown button text
-    //         const dropdownButton = this.closest('.dropdown').querySelector('.dropdown-toggle');
-    //         dropdownButton.textContent = location;
-    //         //reload window
-    //         window.location.reload();
-    //     });
-    // });
-}
-async function loadData() {
-    console.log("loading data");
-    let patientsNEEDINGCERTED = [];
-    let dataToFormat = [];
-    document.getElementById("table-container").innerHTML = ""
-    chrome.storage.local.get(facilityIDKey).then(facID => {
-        facilityID = facID[facilityIDKey];
-        chrome.storage.local.get(facilityID).then(data => {
-            let date = new Date();
-            let today = date.getFullYear() + "-" + String((date.getMonth() + 1)).padStart(2, '0') + "-" + String(date.getDate()).padStart(2, '0');
-            let listDate = data[facilityID]['PatientLists']['date']
-            if (listDate !== today) { console.log('lists out of date, displaying message'); listsOutOfDate(listDate); return; }
-            allPatientData = data[facilityID]['Patients'];
-            patientsSeen = data[facilityID]['PatientLists']['seenToday'];
-            patientsCerted = data[facilityID]['PatientLists']['certedToday'];
-            patientsNEEDINGCERTED = patientsSeen.filter(patient => !patientsCerted.includes(patient));
-            switch (viewCerted) {
-                case true:
-                    patientsCerted.forEach((id) => {
-                        dataToFormat.push(allPatientData[id]);
-                    })
-                    break;
-                case false:
-                    patientsNEEDINGCERTED.forEach(id => {
-                        dataToFormat.push(allPatientData[id]);
-                    })
-                    break;
-            }
-            formatPage(listDate,dataToFormat);
-            addListeners();
-        })
-    })
-}
-async function formatPage(listDate,dataToFormat) {
-    let header = document.getElementById('totals-header');
-    let facility = facilityIDToFacilityNameLUT[facilityID] ?? facilityID;
-    let facilityDiv = document.getElementById('facility-div');
-    let seenDiv = document.getElementById('seen-div');
-    let certedDiv = document.getElementById('certed-div');
-    let dateDiv = document.getElementById('date-div');
-    facilityDiv.innerHTML = `<b>Facility: </b>${facility}`;
-    seenDiv.innerHTML = `<b>Patients Total: </b>${patientsSeen.length}`;
-    certedDiv.innerHTML = `<b>Patients Certed: </b>${patientsCerted.length}`;
-    dateDiv.innerHTML = listDate;
-    header.classList.remove('d-none');
-    let table = formatTable(dataToFormat);
-    table.setAttribute("id", "myTable");
-    table.setAttribute("class", "table table-sm table-hover");
-    document.getElementById("table-container").appendChild(table);
-    document.getElementById('stats').classList.remove('d-none');
-    document.getElementById('table-container').classList.remove('d-none');
-}
-function formatTable(dataToFormat) {
-    console.log("formatting Table with: " + dataToFormat);
-    const itemsToDisplay = ["Name", "Status", "Actions"];
-    const table = document.createElement("table");
-    const head = document.createElement("thead");
-    const body = document.createElement("tbody");
-    const headerRow = document.createElement("tr");
-    //header section
-    itemsToDisplay.forEach(item => {
-        const header = document.createElement("th");
-        header.textContent = item;
-        headerRow.appendChild(header);
-    })
-    head.appendChild(headerRow);
-    table.appendChild(head);
-    //row sections
-    //switch on viewCerted toggle
-    switch (viewCerted) {
-        case true:
-            dataToFormat.forEach(patient => {
-                let key = patient.consumerID;
-                let actions = ["View Certificate"];
-                let status = "Cert Reviewed";
-                const row = document.createElement("tr");
-                row.setAttribute("id", key); // set row ID to consumerID for use in onClick listener
-                // name cell
-                let cell = document.createElement("td");
-                cell.classList.add("align-middle");
-                cell.textContent = patient.compoundName;
-                row.appendChild(cell);
-                // status cell
-                cell = document.createElement("td");
-                cell.classList.add("align-middle");
-                cell.textContent = status;
-                row.appendChild(cell);
-                // action cell
-                cell = document.createElement("td");
-                cell.classList.add("align-middle");
-                let div = document.createElement("div");
-                div.setAttribute("class", "'d-flex gap-3'");
-                actions.forEach(action => {
-                    button = document.createElement('button');
-                    button.innerHTML = action;
-                    button.id = `${key}-${action}`;
-                    button.setAttribute('class','buttonForActions btn btn-link link-secondary btn-sm');
-                    // next code block formats buttons based on actions -- looked ugly so removed
-                    // switch (action) {
-                    //     case 'Mark Certed': button.classList.add('btn-outline-danger'); break;
-                    //     case 'Get State ID': button.classList.add('btn-outline-secondary'); break;
-                    //     case 'View Certificate': button.classList.add('btn-outline-success'); break;
-                    //     case 'Lookup By Name': button.classList.add('btn-outline-warning'); break;
-                    // }
-                    div.appendChild(button);
-                })
-                cell.appendChild(div);
-                row.appendChild(cell);
-                body.appendChild(row);
-                table.appendChild(body);
-            })
-            break;
-        case false:
-            dataToFormat.forEach(patient => {
-                let key = patient.consumerID;
-                let actions = ["Mark Certed"];
-                let status = "";
-                const row = document.createElement("tr");
-                row.setAttribute("id", key); // set row ID to consumerID for use in onClick listener
-                if (!patient.stateID && patient.consumerLicense) { actions.push("Get State ID"); status = "Awaiting State ID"; }
-                if (!patient.stateID && !patient.consumerLicense) { actions.push("Lookup By Name"); status = "Missed"; }
-                if (patient.stateID) { actions.push("View Certificate"); status = "Ready to Cert"; }
-                // name cell
-                let cell = document.createElement("td");
-                cell.classList.add("align-middle");
-                cell.textContent = patient.compoundName;
-                row.appendChild(cell);
-                // status cell
-                cell = document.createElement("td");
-                cell.classList.add("align-middle");
-                cell.textContent = status;
-                row.appendChild(cell);
-                // action cell
-                cell = document.createElement("td");
-                cell.classList.add("align-middle");
-                let div = document.createElement("div");
-                div.setAttribute("class", "'d-flex gap-3'");
-                actions.forEach(action => {
-                    button = document.createElement('button');
-                    button.innerHTML = action;
-                    button.id = `${key}-${action}`;
-                    button.setAttribute('class','buttonForActions btn btn-link link-secondary btn-sm');
-                    // next code block formats buttons based on actions -- looked ugly so removed
-                    // switch (action) {
-                    //     case 'Mark Certed': button.classList.add('btn-outline-danger'); break;
-                    //     case 'Get State ID': button.classList.add('btn-outline-secondary'); break;
-                    //     case 'View Certificate': button.classList.add('btn-outline-success'); break;
-                    //     case 'Lookup By Name': button.classList.add('btn-outline-warning'); break;
-                    // }
-                    div.appendChild(button);
-                })
-                cell.appendChild(div);
-                row.appendChild(cell);
-                body.appendChild(row);
-                table.appendChild(body);
-            });
-            break;
-    }
-    return table;
-}
-function addListeners() {
-    let viewCertedToggleButton = document.getElementById("view-certed-toggle-button");
-    viewCertedToggleButton.addEventListener("click", function() {
-        toggleViewCerted();
-    })
-    addTableButtonListeners();
-    addDataListeners();
-}
-function addTableButtonListeners() {
-    const allButtons = document.getElementsByClassName("buttonForActions");
-    const buttonList = Array.from(allButtons);
-    buttonList.forEach(button => {
-        button.addEventListener('click', async function (event) {
-            const buttonID = event.target.id;
-            const consumerID = buttonID.split('-')[0];
-            const action = buttonID.split('-').pop();
-            const textToCopy = allPatientData[consumerID].consumerLicense ?? allPatientData[consumerID].compoundName;
-            await navigator.clipboard.writeText(textToCopy);
-            let message = {
-                'messageFor': 'background.js',
-                'messageSender': 'popUpClick',
-                'consumerID': consumerID,
-                'textToPaste': textToCopy,
-                'action': action,
-            }
-            if (action === 'Mark Certed') { if (!confirm("Mark this patient as certed manually?")) {
-                    return;
-                } }
-            await chrome.runtime.sendMessage(message,
-                function (response) {
-                if (chrome.runtime.lastError) {
-                    console.warn('addTableButtonListeners: error sending message: ', chrome.runtime.lastError);
-                } else if (response) {
-                    console.log("addTableButtonListeners received response: ", response);
+        //function definitions
+        function extensionNotInitialized() {
+            document.getElementById('extension-not-initialized').classList.remove('d-none');
+        }
+        async function formatPage() {
+            // draw banner first -- this doesn't get reloaded on data change
+            drawBanner();
+            // get facilityID
+            const facilityID = await chrome.storage.local.get([facilityIDKey]);
+            // Load data from local storage
+            let data = await chrome.storage.local.get(facilityID[facilityIDKey]);
+            let patientsSorted = getPatientsSorted(data);
+            await drawTable(patientsSorted);
+            document.getElementById('footer').classList.remove('d-none');
+
+            // function definitions -- helper functions
+            function getPatientsSorted(data) {
+                let allPatientData = data[facilityID[facilityIDKey]]['Patients'];
+                let patientsSeenList = data[facilityID[facilityIDKey]]['PatientLists']['seenToday'];
+                let patientsCertedList = data[facilityID[facilityIDKey]]['PatientLists']['certedToday'];
+                let patientObjectsSorted = {
+                    seenToday: [],
+                    certedToday: [],
+                    needsCerted: [],
                 }
-            })
-            if (action !== 'Mark Certed') { window.close(); }
-        })
-    })
-}
-function addDataListeners() {
-    chrome.storage.onChanged.addListener(function(changes, namespace) {
-        for (var key in changes) {
-            if (namespace === 'local' && key === facilityID) {
-                console.log('data changed, reloading');
-                chrome.storage.onChanged.removeListener();
-                loadData();
+                // iterate through patients we've seen today -- remember these are arrays of consumerIDs and wee need the actual patient objects for data table
+                patientsSeenList.forEach((patient) => {
+                    // add all of these patient objects to the sorted object
+                    patientObjectsSorted['seenToday'].push(allPatientData[patient]);
+                    if (!patientsCertedList.includes(patient)) {
+                        // if this patient isn't in the certed list, add it to the needsCerted property of the sorted object
+                        patientObjectsSorted["needsCerted"].push(allPatientData[patient]);
+                    } else {
+                        // this patient has been certed so add object to certedToday property of sorted object
+                        patientObjectsSorted['certedToday'].push(allPatientData[patient]);
+                    }
+                })
+                return patientObjectsSorted;
+            }
+            function drawBanner() {
+
+            }
+            async function drawTable(patientsSorted) {
+                // clear the table if already exists and we are redrawing do to data change
+                // document.getElementById('to-cert-table').innerHTML = '';
+                // create table with DataTables framework
+                let table = new DataTable('#to-cert-table', {
+                    pageLength: 10,
+                    select: {
+                        style: 'multi',
+                        headerCheckbox: 'select-page',
+                        selector: 'td:first-child',
+                        // headerCheckbox: false
+                    },
+                    order: [[4, 'asc']],
+                    columns: [
+                        {
+                            width: 80,
+                            data: null,
+                            orderable: false,
+                            render: DataTable.render.select()
+                        },
+                        {
+                            width: 400,
+                            data: 'compoundName',
+                            title: 'Name'
+                        },
+                        {
+                            data: 'stateID',
+                            title: 'Status',
+                            class: 'status btn btn-link link-secondary btn-sm',
+                            render: function (data, type, row) {
+                                if (patientsSorted.certedToday.includes(row)) { return 'Completed' }
+                                return (row.hasOwnProperty('stateID')) ? 'View Certificate' : 'Search MJ';
+                            }
+                        },
+                        {
+                            // this column is used to determine if we display people with completed certs -- not visible on page
+                            data: null,
+                            title: 'isCerted',
+                            visible: false,
+                            render: function (data, type, row) {
+                                return patientsSorted.certedToday.includes(data);
+                            }
+                        },
+                        {
+                            // this column is to sort by newest -- default sort, this column is not visible
+                            data: 'orderTimeStamp',
+                            title: 'Time Stamp',
+                            visible: false,
+                        }
+                    ],
+                    data: patientsSorted.seenToday
+                });
+                // initially show only patients that haven't been certed today
+                table.column(3).search('false').draw();
+                // fix for the select all box is in the wrong spot!
+                let selectAll = document.getElementsByClassName('dt-column-header')[0];
+                selectAll.style.setProperty('justify-content', 'center');
+                selectAll.firstChild.remove();
+                selectAll.firstChild.remove();
+                // insert button to mark selected rows as cert completed manually
+                let markCompletedButton = document.createElement('button');
+                markCompletedButton.setAttribute('id', 'mark-completed');
+                markCompletedButton.setAttribute('class', 'btn btn-outline-secondary btn-sm');
+                markCompletedButton.innerHTML = 'Mark Completed';
+                document.getElementById('mark-completed-div').appendChild(markCompletedButton);
+                // replace the records per page with show completed checkbox
+                let entriesPerPage = document.getElementsByClassName('dt-length')[0];
+                entriesPerPage.innerHTML = `<label><input type="checkbox" id="showCompletedCheckbox"> Show Completed</label>`
+                let showCompletedCheckbox = document.getElementById('showCompletedCheckbox');
+                let showCompletedState = await chrome.storage.local.get(['showCompleted']);
+                showCompletedCheckbox.checked = showCompletedState['showCompleted'];
+                if (showCompletedCheckbox.checked) { table.column(3).search('').draw(); }
+                addListeners(table, markCompletedButton, showCompletedCheckbox);
+                //function definitions
+                function addListeners() {
+                    table.on("click", ".status", function () {
+                        let data = table.row(this).data(); // Get the data of the clicked row
+                        let message = {
+                            'messageFor': 'background.js',
+                            'messageSender': 'popUpClick',
+                            'consumerID': data.consumerID,
+                            'searchTextforMJ': data.compoundName,
+                            // action -- we are either sending the textToPaste to MJ or we are opening the PA DOH page with the stateID
+                            'action': data.stateID ? 'openDOHpage' : 'openMJPatientPage',
+                        }
+                        chrome.runtime.sendMessage(message,
+                            function (response) {
+                                if (chrome.runtime.lastError) {
+                                    console.warn('addButtonListeners: error sending message: ', chrome.runtime.lastError);
+                                } else if (response) {
+                                    console.log("addButtonListeners received response: ", response);
+                                }
+                            })
+                        if (message.action === 'openDOHpage') { window.close(); }
+                    });
+                    table.on("change", "input[type='checkbox']", function() {
+                        if (table.rows({ selected: true }).data().length > 0) {
+                            markCompletedButton.classList.remove('d-none');
+                        } else {
+                            markCompletedButton.classList.add('d-none');
+                        }
+                    });
+                    markCompletedButton.addEventListener('click', function(e) {
+                        if (!confirm("Mark checked patients as manually certed? This cannot be undone.")) { return; }
+                        let message = {
+                            'messageFor': 'background.js',
+                            'messageSender': 'popUpClick',
+                            'action': 'markCerted',
+                            'certed': [],
+                        }
+                        let selectedRows = table.rows({ selected: true }).data();
+                        for (let i = 0; i < selectedRows.length; i++) {
+                            message.certed.push(selectedRows[i].consumerID);
+                        }
+                        chrome.runtime.sendMessage(message, function (response) {
+                            if (chrome.runtime.lastError) {
+                                console.warn('markCerted: error sending message: ', chrome.runtime.lastError);
+                            } else if (response) {
+                                console.log('markCerted: message success', response);
+                            }
+                        })
+                    })
+                    showCompletedCheckbox.addEventListener('change', async function () {
+                        if (this.checked) {
+                            table.column(3).search('').draw(); // Clear any existing filter on the isCerted column
+                        } else {
+                            table.column(3).search('false').draw();
+                        }
+                        await chrome.storage.local.set({'showCompleted': this.checked});
+                    })
+                    // reload page if any local data changes occur
+                    chrome.storage.local.onChanged.addListener((changes) => {
+                        if (changes[facilityID[facilityIDKey]]) {
+                            window.location.reload();
+                        }
+                    });
+                }
             }
         }
-    }) }
-function listsOutOfDate(listDate) {
-    document.getElementById('outOfDate').classList.remove('d-none');
-}
-function toggleViewCerted() {
-    if (viewCerted === true) { window.location.reload(); }
-    viewCerted = !viewCerted;
-    let button = document.getElementById("view-certed-toggle-button");
-    button.innerHTML = '< Back'
-    chrome.storage.onChanged.removeListener();
-    loadData();
-}
+    }
+})

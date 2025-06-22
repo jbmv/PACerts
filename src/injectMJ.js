@@ -1,3 +1,10 @@
+// for getting and recording facility id and facility names use api/auth/login response and store as
+// Object.keys(object['user']['facilities']).forEach(function (key) {
+//     let facilityID = object['user']['facilities'][key]['id']
+//     let facilityName = object['user']['facilities'][key]['name']
+//     let message = {'facilityID': facilityID, 'facilityName': facilityName}
+//     console.log(message);
+// })
 const extensionID = "pknjbljkccmnjiibcmjiefofiaopbcnl";
 (function(xhr) {
     var XHR = XMLHttpRequest.prototype;
@@ -25,158 +32,184 @@ const extensionID = "pknjbljkccmnjiibcmjiefofiaopbcnl";
                 if ((myUrl.indexOf('customers?') !== -1)) { let responseData = this.response; if (responseData) { processMJPatientResponse(responseData); }}
                 if ((myUrl.indexOf('daily_transaction_report') !== -1)) { let responseData = this.response; if (responseData) { processMJDailyTransactionsResponse(responseData); }}
                 if ((myUrl.indexOf('set_facility') !== -1)) { let responseData = this.response; if (responseData) { facilityIDMJSet(responseData); }}
+                if ((myUrl.indexOf('login') !== -1)) { let responseData = this.response; if (responseData) { processLogin(responseData); }}
             }
         });
         return send.apply(this, arguments);
-    };
-})(XMLHttpRequest);
-function processOpenOrdersResponse(responseData) {
-    if (responseData) {
-        try {
-            const myObj = JSON.parse(responseData);
-            myObj.forEach((item) => {
-                if (item.consumer_license) {
-                    // Check if extension is installed
-                    if (chrome && chrome.runtime) {
-                        // Make a request:
-                        let facilityIDFromWebpage = getFacilityNameFromWebpage();
-                        chrome.runtime.sendMessage(
-                            extensionID,
-                            {
-                                endPoint: "MJ_open_orders",
-                                webPageFacilityName: facilityIDFromWebpage,
-                                organizationID: item.organization_id.toString(),
-                                consumerID: item.consumer_id.toString(),
-                                facilityId: item.facility_id.toString(),
-                                consumerLicense: item.consumer_license.toString(),
-                                birthDate: item.consumer_birth_date.substring(0, 10),
-                                compoundName: item.consumer_name,
-                                orderDate: item.created_at.substring(0, 10),
-                            }, function(response)  {
+        // function definitions
+        function processOpenOrdersResponse(responseData) {
+            // MJ sends a JSON response with multiple orders of whoever is in the store at the moment
+            if (responseData) {
+                try {
+                    const myObj = JSON.parse(responseData);
+                    myObj.forEach((order) => {
+                        // iterate through each order and send the data to background service worker
+                        if (order.consumer_license) {
+                            // Check if extension is installed
+                            if (chrome && chrome.runtime) {
+                                chrome.runtime.sendMessage(
+                                    // external messages require extensionID
+                                    extensionID,
+                                    {
+                                        apiCall: "MJ_open_orders",
+                                        // conditionally add patient properties if they exist
+                                        ...(order.hasOwnProperty('organization_id') && { organizationID: order.organization_id.toString() }),
+                                        ...(order.hasOwnProperty('consumer_id') && { consumerID: order.consumer_id.toString() }),
+                                        ...(order.hasOwnProperty('facility_id') && {facilityID: order.facility_id.toString() }),
+                                        ...(order.hasOwnProperty('consumer_license') && { consumerLicense: order.consumer_license.toString() }),
+                                        ...(order.hasOwnProperty('consumer_birth_date') && { birthDate: order.consumer_birth_date.substring(0, 10) }),
+                                        ...(order.hasOwnProperty('consumer_name') && { compoundName: order.consumer_name }),
+                                        ...(order.hasOwnProperty('created_at') && { orderTimeStamp: new Date(order.created_at).getTime() }),
+                                        ...(order.hasOwnProperty('created_at') && { orderDate: order.created_at.substring(0, 10) })
+                                    }, function(response)  {
+                                        if (chrome.runtime.lastError) {
+                                            console.warn("InjectMJ: processOpenOrdersResponse:", chrome.runtime.lastError.message);
+                                        } else if (response) {
+                                            console.log("injectMJ: received response : ", response);
+                                        }
+                                    })
+                            }
+                        }
+                    })
+                } catch (e) {
+                    console.log("error parsing JSON:", e);
+                }
+            }
+
+        }
+        function processMJPatientResponse(responseData) {
+            // MJ sends info for each patient that matches the search field -- we should just process and send all of them to background service worker
+            try {
+                const patientSearchResultsMJ = JSON.parse(responseData);
+                if (patientSearchResultsMJ.results.length > 0) {
+                    patientSearchResultsMJ.results.forEach((patient) => {
+                        // process each patient object and send data to background service worker
+                        if (chrome && chrome.runtime) {
+                            // check if extension is installed
+                            let message = {
+                                // external messages require extensionID
+                                extensionID,
+                                apiCall: "MJ_patients",
+                                ...(patient.hasOwnProperty('organization_id') && {'organization_id': patient.organization_id.toString()}),
+                                ...(patient.hasOwnProperty('consumer_id') && {'consumerID': patient.consumer_id.toString()}),
+                                ...(patient.hasOwnProperty('consumer_name') && {'compoundName': patient.consumer_name}),
+                                ...(patient.hasOwnProperty('med_license_number_latest') && {'consumerLicense': patient.med_license_number_latest.toString()}),
+                                ...(patient.hasOwnProperty('first_name') && {'firstName': patient.first_name}),
+                                ...(patient.hasOwnProperty('last_name') && {'lastName': patient.last_name}),
+                                ...(patient.hasOwnProperty('patient_state_id') && {'stateID': patient.patient_state_id.toString()}),
+                                ...(patient.hasOwnProperty('birth_date') && {'birthDate': patient.birth_date.substring(0, 10)})
+                            }
+                            chrome.runtime.sendMessage(extensionID, message, function(response) {
                                 if (chrome.runtime.lastError) {
-                                    console.warn("InjectMJ: processOpenOrdersResponse:", chrome.runtime.lastError.message);
+                                    console.warn("InjectMJ: processMJPatientResponse:", chrome.runtime.lastError.message);
                                 } else if (response) {
-                                    console.log("injectMJ: received response : ", response);
+                                    console.log("injectMJ processPatientResponse response received: ", response);
                                 }
                             })
-                    }
-                }
-            })
-        } catch (e) {
-            console.log("error parsing JSON:", e);
-        }
-    }
-
-}
-function processMJPatientResponse(responseData) {
-    try {
-        const patientSearchResultsMJ = JSON.parse(responseData);
-        if (patientSearchResultsMJ.results.length > 0) {
-            patientSearchResultsMJ.results.forEach((patient) => {
-                if (chrome && chrome.runtime) {
-                    // Make a request:
-                    let facilityNameFromPage = getFacilityNameFromWebpage();
-                    let message = {
-                        endPoint: "MJ_patients",
-                        webPageFacilityName: facilityNameFromPage
-                    };
-                    if (patient.organization_id) { message.organization_id = patient.organization_id.toString(); }
-                    if (patient.consumer_id) { message.consumerID = patient.consumer_id.toString(); }
-                    if (patient.consumer_name) { message.compoundName = patient.consumer_name; }
-                    if (patient.med_license_number_latest) { message.consumerLicense = patient.med_license_number_latest.toString(); }
-                    if (patient.first_name) { message.firstName = patient.first_name; }
-                    if (patient.last_name) { message.lastName = patient.last_name; }
-                    if (patient.patient_state_id) { message.stateID = patient.patient_state_id.toString(); }
-                    if (patient.birth_date) { message.birthDate = patient.birth_date.substring(0, 10); }
-                    chrome.runtime.sendMessage(extensionID, message, function(response) {
-                        if (chrome.runtime.lastError) {
-                            console.warn("InjectMJ: processMJPatientResponse:", chrome.runtime.lastError.message);
-                        } else if (response) {
-                            console.log("injectMJ processPatientResponse response received: ", response);
                         }
                     })
                 }
-            })
-        }
-    } catch (e) {
-        console.log("error sending request:", e);
-    }
-}
-function processMJDailyTransactionsResponse(responseData) {
-    let transactions = {};
-    try {
-        const myObj = JSON.parse(responseData);
-        myObj.forEach((transaction) => {
-            if (transaction.consumer_id && transaction.consumer_name) {
-                transactions[transaction.consumer_id.toString()] = transaction.consumer_name;
+            } catch (e) {
+                console.log("error sending request:", e);
             }
-        })
-        if (chrome && chrome.runtime) {
-            // Make a request:
-            let facilityNameFromWebpage = getFacilityNameFromWebpage();
-            chrome.runtime.sendMessage(extensionID,
-                {
-                    endPoint: "MJ_daily_transaction_report",
-                    webPageFacilityName: facilityNameFromWebpage,
-                    transactions: transactions,
-                }, function (response) {
-                if (chrome.runtime.lastError) {
-                    console.warn("InjectMJ: processMJDailyTransactionsResponse:", chrome.runtime.lastError.message);
-                } else if (response) {
-                    console.log("injectMJ processDailyTransactionsResponse recieved response:", response);
-                }
-            })
         }
-    } catch (e) {
-        console.log("error parsing JSON:", e);
-    }
-}
-function facilityIDMJSet(responseData) {
-    if (responseData) {
-        try {
-            const myObj = JSON.parse(responseData);
-            if (myObj.environment.facility_id) {
-                // Check if extension is installed
+        function processMJDailyTransactionsResponse(responseData) {
+            // MJ sends a list of transactions completed so far today, send patient data of each transaction to backround service worker
+            let transactions = {};
+            try {
+                const myObj = JSON.parse(responseData);
+                myObj.forEach((transaction) => {
+                    // iterate through all transactions and send the data to background service worker
+                    // sends { consumerID: compoundName }
+                    if (transaction.consumer_id && transaction.consumer_name && transaction.order_date) {
+                        transactions[transaction.consumer_id.toString()] = {
+                            'compoundName': transaction.consumer_name,
+                            'orderTimeStamp': new Date(transaction.order_date).getTime()
+                        }
+                    }
+                })
                 if (chrome && chrome.runtime) {
-                    // Make a request:
                     chrome.runtime.sendMessage(
+                        // external messages require extensionID
                         extensionID,
                         {
-                            messageFor: 'setFacilityID',
-                            facilityId: myObj.environment.facility_id.toString(),
-                        }, function (response) {
+                            apiCall: "MJ_daily_transaction_report",
+                            transactions: transactions,
+                        },
+                        function (response) {
                             if (chrome.runtime.lastError) {
-                                console.warn("InjectMJ: facilityIDMJSet:", chrome.runtime.lastError.message);
+                                console.warn("InjectMJ: processMJDailyTransactionsResponse:", chrome.runtime.lastError.message);
                             } else if (response) {
-                                console.log("injectMJ facilityIDMJSet recieved response:", response);
+                                console.log("injectMJ processDailyTransactionsResponse recieved response:", response);
                             }
                         })
                 }
+            } catch (e) {
+                console.log("error parsing JSON:", e);
             }
-        } catch (e) {
-            console.log("error parsing JSON:", e);
         }
-    }
+        function facilityIDMJSet(responseData) {
+            // User chose a new facility to log in to -- send facilityID to background service worker to reinitialize and load new facility data
+            if (responseData) {
+                try {
+                    const myObj = JSON.parse(responseData);
+                    if (myObj.environment.facility_id) {
+                        // Check if extension is installed
+                        if (chrome && chrome.runtime) {
+                            chrome.runtime.sendMessage(
+                                // external messages require extensionID
+                                extensionID,
+                                {
+                                    apiCall: 'setFacilityID',
+                                    facilityID: myObj.environment.facility_id.toString(),
+                                }, function (response) {
+                                    if (chrome.runtime.lastError) {
+                                        console.warn("InjectMJ: facilityIDMJSet:", chrome.runtime.lastError.message);
+                                    } else if (response) {
+                                        console.log("injectMJ facilityIDMJSet recieved response:", response);
+                                    }
+                                })
+                        }
+                    }
+                } catch (e) {
+                    console.log("error parsing JSON:", e);
+                }
+            }
 
-}
-function getFacilityNameFromWebpage() {
-    let container = document.getElementsByClassName('hidden-xs');
-    if (container[0]) {
-        return container[0].innerHTML.substring(document.getElementsByClassName('hidden-xs')[0].innerHTML.indexOf('-') + 2);
-    }
-}
-function setNativeValue(element, value) {
-    const valueSetter = Object.getOwnPropertyDescriptor(element, 'value').set;
-    const prototype = Object.getPrototypeOf(element);
-    const prototypeValueSetter = Object.getOwnPropertyDescriptor(prototype, 'value').set;
-
-    if (valueSetter && valueSetter !== prototypeValueSetter) {
-        prototypeValueSetter.call(element, value);
-    } else {
-        valueSetter.call(element, value);
-    }
-}
-
+        }
+        function processLogin(responseData) {
+            // MJ sends facilityID and facilityName combinations in this response -- send these to background service worker to keep a mapping of this info for display purposes
+            if (responseData) {
+                try {
+                    const myObj = JSON.parse(responseData);
+                    let facilityIDToNameMap = {};
+                    Object.keys(myObj['user']['facilities']).forEach(function (key) {
+                        facilityIDToNameMap[myObj['user']['facilities'][key]['id']] = myObj['user']['facilities'][key]['name'];
+                    })
+                    if (chrome && chrome.runtime) {
+                        chrome.runtime.sendMessage(
+                            // external messages require extensionID
+                            extensionID,
+                            {
+                                'apiCall': 'MJ_login',
+                                'facilityIDToNameMap': facilityIDToNameMap
+                            }, function (response) {
+                                if (chrome.runtime.lastError) {
+                                    console.warn("InjectMJ: facilityIDMJSet:", chrome.runtime.lastError.message);
+                                } else if (response) {
+                                    console.log("injectMJ facilityIDMJSet recieved response:", response);
+                                }
+                            })
+                    }
+                } catch (e) {
+                    console.warn("error parsing JSON:", e);
+                }
+            }
+        }
+    };
+})(XMLHttpRequest);
+// Await document load and add listener if on patients page to process contentscript search text in react virtual DOM
+// This had to be done by injection because content scripts do not have access to react javascript functions (setNativeValue in this case)
 document.addEventListener('DOMContentLoaded', function(event) {
     currentUrl = window.location.href;
     if (currentUrl.indexOf('app.mjplatform.com/patients') !== -1) {
@@ -189,6 +222,18 @@ document.addEventListener('DOMContentLoaded', function(event) {
                 setNativeValue(searchBox, value)
                 searchBox.dispatchEvent(new Event('input', { bubbles: true }));
             })
+        }
+    }
+    // function definitions
+    function setNativeValue(element, value) {
+        // attempt to set react virtual DOM text box once it has data pasted from content script
+        const valueSetter = Object.getOwnPropertyDescriptor(element, 'value').set;
+        const prototype = Object.getPrototypeOf(element);
+        const prototypeValueSetter = Object.getOwnPropertyDescriptor(prototype, 'value').set;
+        if (valueSetter && valueSetter !== prototypeValueSetter) {
+            prototypeValueSetter.call(element, value);
+        } else {
+            valueSetter.call(element, value);
         }
     }
 })
