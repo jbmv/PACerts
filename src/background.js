@@ -17,7 +17,7 @@ console.log('state set to: initializing, context incogito :', isIncognitoMode);
 chrome.runtime.onMessageExternal.addListener(initializeExtension);
 chrome.runtime.onMessage.addListener(initializeExtension);
 async function initializeExtension(message, sender, sendResponse) {
-  // if message is from MJ Login page -- grab and store the facilityID to names info
+  // if message is from MJ Login page -- grab and store the facilityID to names info, it's the only time this info is available
   if (message.apiCall === 'MJ_login') {
     await processMJLogin(message);
   }
@@ -411,7 +411,7 @@ async function initializeExtension(message, sender, sendResponse) {
   }
 
   async function openWorkingPages() {
-    // MJ really doesn't like to have these pages opened in rapid succession so... delay 2 seconds
+    // MJ really doesn't like to have these pages opened right after login... delay 2 seconds
     setTimeout(async () => {
       let tabs = await chrome.tabs.query({url: '*://*.mjplatform.com/patients'});
       if (tabs.length === 0) {
