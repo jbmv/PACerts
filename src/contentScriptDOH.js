@@ -21,7 +21,7 @@ async function main() {
     setInterval(sendHeartbeat, 25000);
     // function definitions
     function handleInternalMessage(message, sender, sendResponse) {
-        console.log('contentScriptDOH received message for: ' + message.messageFunction);
+        console.log(`contentScriptDOH received message for: ${message.messageFunction} initiated by ${message.initiator}`);
         switch (message.messageFunction) {
             case 'DOHSearchPatient':
                 searchPatientDOH(message);
@@ -65,7 +65,7 @@ async function main() {
                         if (mutation.type === 'childList') {
                             observer.disconnect();
                             setTimeout(function () {
-                                // Code to be executed after 1 second
+                                // Code to be executed after 1 second -- need to wait for all cert data to be returned from xhttp request
                                 let certData = getCertData();
                                 formatCertData(certData);
                                 let noteTextArea = document.getElementById('dispensarynote');
@@ -73,14 +73,16 @@ async function main() {
                                 loadingDivs.forEach((div) => {
                                     div.remove();
                                 })
+                                // everything is done and formatted -- wait for save button to be clicked to send message back to background service worker to mark patient as certed
                                 waitForSaveButtonClick(consumerID, stateID, certData);
+                                // if autoCert is active, click the save button programatically after setting textArea to signature
                                 if (message.initiator === 'autoCert' && options.autoCert === true) {
                                     let limitationsToIgnore = ['None','none','no'];
                                     if (limitationsToIgnore.includes(certData.limitations.trim())
                                         && certData.firstVisit === false
                                         && certData.indications.length > 0) {
-                                        noteTextArea.value = "reviewed";
-                                        console.log('this patient would have been auto certed');
+                                        noteTextArea.value = "reviewed"; //TODO: replace this hard-coded 'reviewed' with signoff from options
+                                        console.log('this patient would have been auto certed'); // not actually automated YET
                                     }
                                 }
                             }, 1000);
