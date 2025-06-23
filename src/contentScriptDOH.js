@@ -5,6 +5,7 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 
 async function main() {
+    let options = { autoCert: true }; //TODO: implement real options
     // wake up background service worker in case it was asleep
     await chrome.runtime.sendMessage({ message: 'wakeup from contentScriptDOH' }, function (response) {
         if (chrome.runtime.lastError) {
@@ -62,7 +63,6 @@ async function main() {
                 const observer = new MutationObserver((mutationsList, observer) => {
                     for (const mutation of mutationsList) {
                         if (mutation.type === 'childList') {
-                            console.log('A child node has been added or removed.');
                             observer.disconnect();
                             setTimeout(function () {
                                 // Code to be executed after 1 second
@@ -73,6 +73,16 @@ async function main() {
                                 loadingDivs.forEach((div) => {
                                     div.remove();
                                 })
+                                waitForSaveButtonClick(consumerID, stateID, certData);
+                                if (message.initiator === 'autoCert' && options.autoCert === true) {
+                                    let limitationsToIgnore = ['None','none','no'];
+                                    if (limitationsToIgnore.includes(certData.limitations.trim())
+                                        && certData.firstVisit === false
+                                        && certData.indications.length > 0) {
+                                        noteTextArea.value = "reviewed";
+                                        console.log('this patient would have been auto certed');
+                                    }
+                                }
                             }, 1000);
                         }
                     }
@@ -83,7 +93,6 @@ async function main() {
                     subtree: true, // Observe changes within the subtree
                 };
                 await observer.observe(targetNode, config);
-                waitForSaveButtonClick(consumerID, stateID);
             } else {
                 sendResponse({'DOHSearchPatient': 'failed -- element not present...logged in?'});
             }
@@ -126,6 +135,8 @@ async function main() {
                 });
             }
             function getCertData() {
+                let date = new Date();
+                let today = date.getFullYear() + '-' + String((date.getMonth() + 1)).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
                 let SMCs = {
                     SMC_1: 'ALS',
                     SMC_22: 'Anxiety',
@@ -177,6 +188,7 @@ async function main() {
                     limitations = document.getElementById('anylimitationtext').value;
                 }
                 return {
+                    date: today,
                     limitations: limitations,
                     indications: indications,
                     firstVisit: isFirstVisit,
@@ -199,7 +211,7 @@ async function main() {
                 if (certData.firstVisit) { firstVisit.classList.add('mark'); firstVisit.setAttribute('style', "font-weight: bolder; color: red;");}
                 if (certData.indications.length === 0) { indications.classList.add('mark'); indications.setAttribute('style', "font-weight: bolder; color: red;");}
             }
-            function waitForSaveButtonClick(consumerID, stateID) {
+            function waitForSaveButtonClick(consumerID, stateID, certData) {
                 // listen for the save button to be clicked, then tell background service worker to mark the patietn certed
                 const save = document.getElementsByClassName('medicalProfSave')[0];
                 save.addEventListener('click', function () {
@@ -214,6 +226,7 @@ async function main() {
                         messageSender: 'padoh',
                         consumerID: consumerID,
                         stateID: stateID,
+                        certData: certData
                     };
                     chrome.runtime.sendMessage(message, function (response) {
                         if (chrome.runtime.lastError) {

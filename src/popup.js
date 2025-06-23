@@ -5,6 +5,8 @@ document.addEventListener("DOMContentLoaded", function(e) {
     // wrapper function to make await/async calls after DOM loaded
     main();
     async function main() {
+        let date = new Date();
+        let today = date.getFullYear() + '-' + String((date.getMonth() + 1)).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
         // wake up background service worker in case it was asleep
         await chrome.runtime.sendMessage({message: 'wakeup'}, function (response) {
             if (chrome.runtime.lastError) {
@@ -85,7 +87,7 @@ document.addEventListener("DOMContentLoaded", function(e) {
                         selector: 'td:first-child',
                         // headerCheckbox: false
                     },
-                    order: [[4, 'asc']],
+                    order: [[5, 'asc']],
                     columns: [
                         {
                             width: 80,
@@ -94,9 +96,24 @@ document.addEventListener("DOMContentLoaded", function(e) {
                             render: DataTable.render.select()
                         },
                         {
-                            width: 400,
+                            width: 150,
                             data: 'compoundName',
                             title: 'Name'
+                        },
+                        {
+                            data: 'certData',
+                            title: 'Cert Notes',
+                            width: 350,
+                            render: function (data, type, row) {
+                                if (row.hasOwnProperty('certData') && row.certData.date === today) {
+                                    let text = '';
+                                    let limitationsToIgnore = ['None','none','no'];
+                                    if (!limitationsToIgnore.includes(row.certData.limitations.trim())) {text += `Limitations: ${row.certData.limitations}!   `;}
+                                    if (row.certData.firstVisit === true) {text += `First Visit!   `;}
+                                    text += `Indications: ${row.certData.indications.join(", ")}   `;
+                                    return text;
+                                } else { return ''; }
+                            }
                         },
                         {
                             data: 'stateID',
@@ -120,13 +137,13 @@ document.addEventListener("DOMContentLoaded", function(e) {
                             // this column is to sort by newest -- default sort, this column is not visible
                             data: 'orderTimeStamp',
                             title: 'Time Stamp',
-                            visible: false,
+                            visible: true,
                         }
                     ],
                     data: patientsSorted.seenToday
                 });
                 // initially show only patients that haven't been certed today
-                table.column(3).search('false').draw();
+                table.column(4).search('false').draw();
                 // fix for the select all box is in the wrong spot!
                 let selectAll = document.getElementsByClassName('dt-column-header')[0];
                 selectAll.style.setProperty('justify-content', 'center');
@@ -142,9 +159,6 @@ document.addEventListener("DOMContentLoaded", function(e) {
                 let entriesPerPage = document.getElementsByClassName('dt-length')[0];
                 entriesPerPage.innerHTML = `<label><input type="checkbox" id="showCompletedCheckbox"> Show Completed</label>`
                 let showCompletedCheckbox = document.getElementById('showCompletedCheckbox');
-                let showCompletedState = await chrome.storage.local.get(['showCompleted']);
-                showCompletedCheckbox.checked = showCompletedState['showCompleted'];
-                if (showCompletedCheckbox.checked) { table.column(3).search('').draw(); }
                 addListeners(table, markCompletedButton, showCompletedCheckbox);
                 //function definitions
                 function addListeners() {
@@ -197,11 +211,10 @@ document.addEventListener("DOMContentLoaded", function(e) {
                     })
                     showCompletedCheckbox.addEventListener('change', async function () {
                         if (this.checked) {
-                            table.column(3).search('').draw(); // Clear any existing filter on the isCerted column
+                            table.column(4).search('').draw(); // Clear any existing filter on the isCerted column
                         } else {
-                            table.column(3).search('false').draw();
+                            table.column(4).search('false').draw();
                         }
-                        await chrome.storage.local.set({'showCompleted': this.checked});
                     })
                     // reload page if any local data changes occur
                     chrome.storage.local.onChanged.addListener((changes) => {

@@ -10,6 +10,7 @@ let date = new Date();
 let today = date.getFullYear() + '-' + String((date.getMonth() + 1)).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
 let patients = {};
 let patientLists = {};
+let options = { autoCert: true }; //TODO: implement real options
 // set state in local storage and await initialization message from MJ to know which facility to load from local storage
 chrome.action.setIcon({path:'icons/icon32-red.png'});
 chrome.storage.local.set({ [stateKey]: state });
@@ -58,6 +59,8 @@ async function initializeExtension(message, sender, sendResponse) {
     await chrome.storage.local.set({[facilityIDKey]: facilityID});
     chrome.runtime.onMessageExternal.addListener(handleExternalMessage);
     chrome.runtime.onMessage.addListener(handleInternalMessage);
+    await chrome.alarms.create('periodic-queue-alarm', {periodInMinutes: 0.5});
+    chrome.alarms.onAlarm.addListener(handlePeriodicAlarm);
     // let's open or refresh all MJ and DOH pages as well -- since something caused the extension to reload -- also it's nice to open all the pages automatically
     // TODO options page entry for auto page open preferences
     await openWorkingPages();
@@ -68,7 +71,6 @@ async function initializeExtension(message, sender, sendResponse) {
 
   // function definitions -- message handlers
   async function handleExternalMessage(message, sender, sendResponse) {
-    console.log('external message', message);
     // Check order.facilityID to see if it matches the one in memory
     if (message.facilityID && message.facilityID.length > 0) {
       if (message.facilityID !== facilityID) {
@@ -120,7 +122,6 @@ async function initializeExtension(message, sender, sendResponse) {
           if (order.orderDate !== today) {
             // we know today is fresh so if this order.orderDate doesn't match then discard the order (stale order)
             //MJ sent us old order info that has nothing to do with date's patients -- ignore it
-            console.log('stale oder, ignoring');
           }
         } else if (order.orderDate === today && !patientLists['seenToday'].includes(order.consumerID)) {
           // only process patients where the order date is today, and we haven't already processed this patient
@@ -250,7 +251,7 @@ async function initializeExtension(message, sender, sendResponse) {
         processPopUpClick(message);
         break;
       case 'padoh':
-        processPatientCerted(message.stateID, message.consumerID);
+        processPatientCerted(message.stateID, message.consumerID, message.certData);
         break;
       default:
         console.log('No handler for internal sender: ', message.messageSender);
@@ -276,15 +277,16 @@ async function initializeExtension(message, sender, sendResponse) {
           searchMJPatient(searchTextforMJ);
           break;
         case 'openDOHpage':
-          openDOHpage(consumerID);
+          openDOHpage(consumerID, 'popUpClick');
           break;
       }
     }
 
-    function processPatientCerted(dohStateID, dohConsumerID) {
+    function processPatientCerted(dohStateID, dohConsumerID, certData) {
       if (patients[dohConsumerID] && patients[dohConsumerID].stateID === dohStateID) {
         if (!patientLists['certedToday'].includes(dohConsumerID)) {
           patientLists['certedToday'].push(dohConsumerID);
+          patients[dohConsumerID]['certData'] = certData;
           console.log('pateint marked as certed:', dohConsumerID);
           writeFacilityKeyToStorageApi();
         }
@@ -292,41 +294,29 @@ async function initializeExtension(message, sender, sendResponse) {
         console.error('processPatientCerted: no match on patient with doh sent:', dohConsumerID, dohStateID);
       }
     }
+  }
 
-    //helper functions
-    async function openDOHpage(consumerID) {
-      let tabs = await chrome.tabs.query({url: 'https://*.padohmmp.custhelp.com/*'});
-      let patient = {
-        birthDate: patients[consumerID].birthDate,
-        stateID: patients[consumerID].stateID,
-        lastName: patients[consumerID].lastName,
-        consumerID: consumerID
-      };
-      let message = {
-        'messageFor': 'contentScript.js',
-        'messageFunction': 'DOHSearchPatient',
-        'patient': patient
-      };
-      if (tabs.length === 0) {
-        //open new doh page in a tab if one isn't already open
-        await chrome.tabs.create({url: 'https://padohmmp.custhelp.com/app/patient-certifications-med', active: true});
-        tabs = await chrome.tabs.query({url: 'https://padohmmp.custhelp.com/*'});
-        await chrome.tabs.sendMessage(tabs[0].id, message, response => {
-          if (chrome.runtime.lastError) {
-            console.warn('openDOHpage: error sending message, receiver doesnt exist ', chrome.runtime.lastError);
-          }
-        });
-      } else {
-        // handle patient DOH pasting
-        await chrome.tabs.update(tabs[0].id, {active: true});
-        await chrome.tabs.sendMessage(tabs[0].id, message, response => {
-          if (chrome.runtime.lastError) {
-            console.warn('openDOHpage: error sending message, receiver doesnt exist ', chrome.runtime.lastError);
-          }
-        });
+  async function handlePeriodicAlarm() {
+    // process 1 patient every 30 seconds
+    let patientsToProcess = patientLists.seenToday.filter(patient => !patientLists.certedToday.includes(patient));
+    for (patient in patientsToProcess) {
+      // using for in instead of .forEach because we only process a single patient per alarm
+      if (options.autoCert === true
+          && patients[patientsToProcess[patient]].hasOwnProperty('stateID')
+          && (!patients[patientsToProcess[patient]].hasOwnProperty('certData')
+              || patients[patientsToProcess[patient]].certData.date !== today)) {
+        console.log("this patient would have been auto certed: ", patientsToProcess[patient]);
+        openDOHpage(patientsToProcess[patient],'autoCert');
+        writeFacilityKeyToStorageApi();
+        break;
+      } else if ((patients[patientsToProcess[patient]].orderTimeStamp + 30000) < (new Date().getTime())) {
+        // patient without stateID still in queue after 30 seconds so look them up by name in MJ
+        await searchMJPatient(patients[patientsToProcess[patient]].compoundName);
+        console.log('this patient had state id looked up: ', patientsToProcess[patient]);
+        writeFacilityKeyToStorageApi();
+        break;
       }
     }
-
   }
 
   //function definitions -- these need to be accessible for both internal and external message handling
@@ -378,6 +368,40 @@ async function initializeExtension(message, sender, sendResponse) {
       }
     })
     await chrome.storage.local.set({'facilityIDToNameMap': mapFromStorage['facilityIDToNameMap']});
+  }
+
+  async function openDOHpage(consumerID, initiator) {
+    let tabs = await chrome.tabs.query({url: 'https://*.padohmmp.custhelp.com/*'});
+    let patient = {
+      birthDate: patients[consumerID].birthDate,
+      stateID: patients[consumerID].stateID,
+      lastName: patients[consumerID].lastName,
+      consumerID: consumerID
+    };
+    let message = {
+      'messageFor': 'contentScript.js',
+      'messageFunction': 'DOHSearchPatient',
+      'patient': patient,
+      'initiator': initiator
+    };
+    if (tabs.length === 0) {
+      //open new doh page in a tab if one isn't already open
+      await chrome.tabs.create({url: 'https://padohmmp.custhelp.com/app/patient-certifications-med', active: true});
+      tabs = await chrome.tabs.query({url: 'https://padohmmp.custhelp.com/*'});
+      await chrome.tabs.sendMessage(tabs[0].id, message, response => {
+        if (chrome.runtime.lastError) {
+          console.warn('openDOHpage: error sending message, receiver doesnt exist ', chrome.runtime.lastError);
+        }
+      });
+    } else {
+      // handle patient DOH pasting
+      await chrome.tabs.update(tabs[0].id, {active: true});
+      await chrome.tabs.sendMessage(tabs[0].id, message, response => {
+        if (chrome.runtime.lastError) {
+          console.warn('openDOHpage: error sending message, receiver doesnt exist ', chrome.runtime.lastError);
+        }
+      });
+    }
   }
 
   async function updateBadgeCounter() {

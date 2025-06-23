@@ -59,7 +59,8 @@ const extensionID = "pknjbljkccmnjiibcmjiefofiaopbcnl";
                                         ...(order.hasOwnProperty('consumer_license') && { consumerLicense: order.consumer_license.toString() }),
                                         ...(order.hasOwnProperty('consumer_birth_date') && { birthDate: order.consumer_birth_date.substring(0, 10) }),
                                         ...(order.hasOwnProperty('consumer_name') && { compoundName: order.consumer_name }),
-                                        ...(order.hasOwnProperty('created_at') && { orderTimeStamp: new Date(order.created_at).getTime() }),
+                                        // created_at property in MJ is in GMT even though it's not labeled as such
+                                        ...(order.hasOwnProperty('created_at') && { orderTimeStamp: new Date(`${order.created_at} GMT`).getTime() }),
                                         ...(order.hasOwnProperty('created_at') && { orderDate: order.created_at.substring(0, 10) })
                                     }, function(response)  {
                                         if (chrome.runtime.lastError) {
