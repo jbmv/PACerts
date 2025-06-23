@@ -95,7 +95,7 @@ async function initializeExtension(message, sender, sendResponse) {
         await processMJLogin(message);
         break;
       default:
-        console.log('No handler for external sender: ', message);
+        console.warn('No handler for external sender: ', message);
         break;
     }
     sendResponse({'response': `background received message: ${message}`});
@@ -116,7 +116,7 @@ async function initializeExtension(message, sender, sendResponse) {
           let actualToday = date.getFullYear() + '-' + String((date.getMonth() + 1)).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
           // compare this new date with the date in memory -- if it's really a new day we need to reload
           if (today !== actualToday) {
-            console.log('date has changed! Extension left running? Reinitializing.');
+            console.warn('date has changed! Extension left running? Reinitializing.');
             await reloadExtension();
           }
           if (order.orderDate !== today) {
@@ -254,7 +254,7 @@ async function initializeExtension(message, sender, sendResponse) {
         processPatientCerted(message.stateID, message.consumerID, message.certData);
         break;
       default:
-        console.log('No handler for internal sender: ', message.messageSender);
+        console.warn('No handler for internal sender: ', message.messageSender);
         break;
     }
     sendResponse({'success': true});
@@ -277,7 +277,7 @@ async function initializeExtension(message, sender, sendResponse) {
           searchMJPatient(searchTextforMJ);
           break;
         case 'openDOHpage':
-          openDOHpage(consumerID, 'popUpClick');
+          certPatientDOH(consumerID, 'popUpClick');
           break;
       }
     }
@@ -306,7 +306,7 @@ async function initializeExtension(message, sender, sendResponse) {
           && (!patients[patientsToProcess[patient]].hasOwnProperty('certData')
               || patients[patientsToProcess[patient]].certData.date !== today)) {
         console.log("this patient would have been auto certed: ", patientsToProcess[patient]);
-        openDOHpage(patientsToProcess[patient],'autoCert');
+        certPatientDOH(patientsToProcess[patient],'autoCert');
         writeFacilityKeyToStorageApi();
         break;
       } else if ((patients[patientsToProcess[patient]].orderTimeStamp + 30000) < (new Date().getTime())) {
@@ -370,7 +370,7 @@ async function initializeExtension(message, sender, sendResponse) {
     await chrome.storage.local.set({'facilityIDToNameMap': mapFromStorage['facilityIDToNameMap']});
   }
 
-  async function openDOHpage(consumerID, initiator) {
+  async function certPatientDOH(consumerID, initiator) {
     let tabs = await chrome.tabs.query({url: 'https://*.padohmmp.custhelp.com/*'});
     let patient = {
       birthDate: patients[consumerID].birthDate,
@@ -395,7 +395,8 @@ async function initializeExtension(message, sender, sendResponse) {
       });
     } else {
       // handle patient DOH pasting
-      await chrome.tabs.update(tabs[0].id, {active: true});
+      // make tab active if manually clicked on, otherwise do it in background if autoCert
+      if (initiator === 'popUpClick') { await chrome.tabs.update(tabs[0].id, {active: true}); }
       await chrome.tabs.sendMessage(tabs[0].id, message, response => {
         if (chrome.runtime.lastError) {
           console.warn('openDOHpage: error sending message, receiver doesnt exist ', chrome.runtime.lastError);
@@ -405,6 +406,7 @@ async function initializeExtension(message, sender, sendResponse) {
   }
 
   async function updateBadgeCounter() {
+    // TODO: autoCert should only flag those with certData (problems) -- need to replace this janky code with a better solution -- also check to see if running is true in both modes first
     // start with counter = 0 for both
     let badgeCounter = 0;
     let badgeCounterIncognito = 0;
