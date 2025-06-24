@@ -253,7 +253,7 @@ async function initializeExtension(message, sender, sendResponse) {
         processPopUpClick(message);
         break;
       case 'padoh':
-        processPatientCerted(message.stateID, message.consumerID, message.certData);
+        processPatientCerted(message.stateID, message.consumerID, message.certData, message.disposition);
         break;
       default:
         console.warn('No handler for internal sender: ', message.messageSender);
@@ -285,7 +285,7 @@ async function initializeExtension(message, sender, sendResponse) {
     }
 
     function processPatientCerted(dohStateID, dohConsumerID, certData, disposition) {
-      if (message.disposition === 'problem') {
+      if (disposition === 'problem') {
         patients[dohConsumerID]['certData'] = certData;
         writeFacilityKeyToStorageApi();
       } else
@@ -313,17 +313,19 @@ async function initializeExtension(message, sender, sendResponse) {
         // using for in instead of .forEach because we only process a single patient per alarm
         if (options['options'].autoCert === true
             && patients[patientsToProcess[patient]].hasOwnProperty('stateID')
-            && (!patients[patientsToProcess[patient]].hasOwnProperty('certData')
-                || patients[patientsToProcess[patient]].certData.disposition !== 'problem')) {
+            && (!patients[patientsToProcess[patient]].hasOwnProperty('certData') || patients[patientsToProcess[patient]].certData.disposition !== 'problem')) {
           console.log("this patient would have been auto certed: ", patientsToProcess[patient]);
-          certPatientDOH(patientsToProcess[patient], 'autoCert');
-          writeFacilityKeyToStorageApi();
+          // certPatientDOH(patientsToProcess[patient], 'autoCert');
+          // writeFacilityKeyToStorageApi();
+          // break out of for loop -- only process 1 patient per alarm
           break;
-        } else if ((patients[patientsToProcess[patient]].orderTimeStamp + 30000) < (new Date().getTime())) {
+        } else if (((patients[patientsToProcess[patient]].orderTimeStamp + 30000) < (new Date().getTime()))
+            && !patients[patientsToProcess[patient]].hasOwnProperty('stateID')) {
           // patient without stateID still in queue after 30 seconds so look them up by name in MJ
           await searchMJPatient(patients[patientsToProcess[patient]].compoundName);
           console.log('this patient had state id looked up: ', patientsToProcess[patient]);
           writeFacilityKeyToStorageApi();
+          // break out of for loop -- only process 1 patient per alarm
           break;
         }
       }

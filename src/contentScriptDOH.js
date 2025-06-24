@@ -84,8 +84,9 @@ async function main() {
                                         noteTextArea.value = "reviewed"; //TODO: replace this hard-coded 'reviewed' with signoff from options
                                         console.log('this patient would have been auto certed'); // not actually automated YET
                                         //TODO: IMPORTANT! -- check cert dates before saving to make sure not already certed
-                                        const save = document.getElementsByClassName('medicalProfSave')[0];
-                                        save.click();
+
+                                        // const save = document.getElementsByClassName('medicalProfSave')[0];
+                                        // save.click();
                                     } else {
                                         let message = {
                                             messageFor: 'background.js',
