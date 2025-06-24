@@ -64,17 +64,21 @@ async function main() {
         try {
             chrome.runtime.sendMessage(message, function (response) {
                 if (chrome.runtime.lastError) {
-                    console.warn(
+                    // reload page if can't send message to background service worker
+                    console.log(
                         'Error sending heartbeat from content script: ',
                         chrome.runtime.lastError.message,
                     );
+                    window.location.reload();
                 } else if (response) {
                     console.info('heartbeat heard: ', response);
                 }
             });
         }
         catch (e) {
-            console.warn('error sending heartbeat: ', e);
+            // reload page if can't send heartbeat
+            console.log('error sending heartbeat: ', e);
+            window.location.reload();
         }
     }
 }

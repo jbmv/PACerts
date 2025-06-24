@@ -1,3 +1,5 @@
+let options = {};
+let limitationsToIgnore = ['None','none','no'];
 // Await document load
 document.addEventListener('DOMContentLoaded', function () {
     // After page load
@@ -5,8 +7,7 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 
 async function main() {
-    let options = { autoCert: true }; //TODO: implement real options
-    // wake up background service worker in case it was asleep
+    options = await chrome.storage.local.get('options');
     await chrome.runtime.sendMessage({ message: 'wakeup from contentScriptDOH' }, function (response) {
         if (chrome.runtime.lastError) {
             // no need to warn, just sending wakeup in case it's inactive
@@ -76,13 +77,34 @@ async function main() {
                                 // everything is done and formatted -- wait for save button to be clicked to send message back to background service worker to mark patient as certed
                                 waitForSaveButtonClick(consumerID, stateID, certData);
                                 // if autoCert is active, click the save button programatically after setting textArea to signature
-                                if (message.initiator === 'autoCert' && options.autoCert === true) {
-                                    let limitationsToIgnore = ['None','none','no'];
-                                    if (limitationsToIgnore.includes(certData.limitations.trim())
+                                if (message.initiator === 'autoCert' && options['options'].autoCert === true) {
+                                    if (limitationsToIgnore.includes(certData.limitations.trim().toLowerCase())
                                         && certData.firstVisit === false
                                         && certData.indications.length > 0) {
                                         noteTextArea.value = "reviewed"; //TODO: replace this hard-coded 'reviewed' with signoff from options
                                         console.log('this patient would have been auto certed'); // not actually automated YET
+                                        //TODO: IMPORTANT! -- check cert dates before saving to make sure not already certed
+                                        const save = document.getElementsByClassName('medicalProfSave')[0];
+                                        save.click();
+                                    } else {
+                                        let message = {
+                                            messageFor: 'background.js',
+                                            messageSender: 'padoh',
+                                            consumerID: consumerID,
+                                            stateID: stateID,
+                                            certData: certData,
+                                            disposition: 'problem'
+                                        };
+                                        chrome.runtime.sendMessage(message, function (response) {
+                                            if (chrome.runtime.lastError) {
+                                                console.warn(
+                                                    'autocert: failed to send message:',
+                                                    chrome.runtime.lastError.message,
+                                                );
+                                            } else if (response) {
+                                                console.log('autoCert: response received: ', response);
+                                            }
+                                        });
                                     }
                                 }
                             }, 1000);
@@ -209,7 +231,7 @@ async function main() {
                 limitations.innerHTML = "Limitations: " + certData.limitations;
                 firstVisit.innerHTML = "First Visit: " + (certData.firstVisit ? "YES" : "No");
                 indications.innerHTML = "Indications: " + certData.indications.join(", ");
-                if (certData.limitations !== 'None') { limitations.classList.add('mark'); limitations.setAttribute('style', "font-weight: bolder; color: red;");}
+                if (!limitationsToIgnore.includes(certData.limitations.trim().toLowerCase())) { limitations.classList.add('mark'); limitations.setAttribute('style', "font-weight: bolder; color: red;");}
                 if (certData.firstVisit) { firstVisit.classList.add('mark'); firstVisit.setAttribute('style', "font-weight: bolder; color: red;");}
                 if (certData.indications.length === 0) { indications.classList.add('mark'); indications.setAttribute('style', "font-weight: bolder; color: red;");}
             }
@@ -228,7 +250,8 @@ async function main() {
                         messageSender: 'padoh',
                         consumerID: consumerID,
                         stateID: stateID,
-                        certData: certData
+                        certData: certData,
+                        disposition: 'certed'
                     };
                     chrome.runtime.sendMessage(message, function (response) {
                         if (chrome.runtime.lastError) {
@@ -264,17 +287,21 @@ async function main() {
         try {
             chrome.runtime.sendMessage(message, function (response) {
                 if (chrome.runtime.lastError) {
-                    console.warn(
+                    // reload page if can't send heartbeat
+                    console.log(
                         'Error sending heartbeat from content script: ',
                         chrome.runtime.lastError.message,
                     );
+                    window.location.reload();
                 } else if (response) {
                     console.info('heartbeat heard: ', response);
                 }
             });
         }
         catch (e) {
+            // reload page if can't send heartbeat
             console.warn('error sending heartbeat: ', e);
+            window.location.reload();
         }
     }
 }

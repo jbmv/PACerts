@@ -87,7 +87,7 @@ document.addEventListener("DOMContentLoaded", function(e) {
                         selector: 'td:first-child',
                         // headerCheckbox: false
                     },
-                    order: [[5, 'asc']],
+                    order: [[5, 'dsc']],
                     columns: [
                         {
                             width: 80,

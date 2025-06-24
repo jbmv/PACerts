@@ -10,7 +10,7 @@ let date = new Date();
 let today = date.getFullYear() + '-' + String((date.getMonth() + 1)).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
 let patients = {};
 let patientLists = {};
-let options = { autoCert: true }; //TODO: implement real options
+let options = {}
 // set state in local storage and await initialization message from MJ to know which facility to load from local storage
 chrome.action.setIcon({path:'icons/icon32-red.png'});
 chrome.storage.local.set({ [stateKey]: state });
@@ -26,6 +26,7 @@ async function initializeExtension(message, sender, sendResponse) {
   // all code for initialization runs in the next if block
   if (message.facilityID && (state === 'initializing')) {
     state = 'loading';
+    options = await chrome.storage.local.get('options'); //TODO: implement real options
     // remove initialization listeners
     chrome.runtime.onMessageExternal.removeListener(initializeExtension);
     chrome.runtime.onMessage.removeListener(initializeExtension);
@@ -59,7 +60,8 @@ async function initializeExtension(message, sender, sendResponse) {
     await chrome.storage.local.set({[facilityIDKey]: facilityID});
     chrome.runtime.onMessageExternal.addListener(handleExternalMessage);
     chrome.runtime.onMessage.addListener(handleInternalMessage);
-    await chrome.alarms.create('periodic-queue-alarm', {periodInMinutes: 0.5});
+    await chrome.alarms.create('queue-thirty-sec-alarm', {periodInMinutes: 0.5});
+    await chrome.alarms.create('health-check-ten-min-alarm', {periodInMinutes: 10});
     chrome.alarms.onAlarm.addListener(handlePeriodicAlarm);
     // let's open or refresh all MJ and DOH pages as well -- since something caused the extension to reload -- also it's nice to open all the pages automatically
     // TODO options page entry for auto page open preferences
@@ -282,40 +284,52 @@ async function initializeExtension(message, sender, sendResponse) {
       }
     }
 
-    function processPatientCerted(dohStateID, dohConsumerID, certData) {
-      if (patients[dohConsumerID] && patients[dohConsumerID].stateID === dohStateID) {
-        if (!patientLists['certedToday'].includes(dohConsumerID)) {
+    function processPatientCerted(dohStateID, dohConsumerID, certData, disposition) {
+      if (message.disposition === 'problem') {
+        patients[dohConsumerID]['certData'] = certData;
+        writeFacilityKeyToStorageApi();
+      } else
+      if (patients[dohConsumerID]
+          && patients[dohConsumerID].stateID === dohStateID
+          && !patientLists['certedToday'].includes(dohConsumerID))
+      {
           patientLists['certedToday'].push(dohConsumerID);
           patients[dohConsumerID]['certData'] = certData;
           console.log('pateint marked as certed:', dohConsumerID);
           writeFacilityKeyToStorageApi();
         }
-      } else {
+      else {
         console.error('processPatientCerted: no match on patient with doh sent:', dohConsumerID, dohStateID);
       }
     }
   }
 
-  async function handlePeriodicAlarm() {
-    // process 1 patient every 30 seconds
-    let patientsToProcess = patientLists.seenToday.filter(patient => !patientLists.certedToday.includes(patient));
-    for (patient in patientsToProcess) {
-      // using for in instead of .forEach because we only process a single patient per alarm
-      if (options.autoCert === true
-          && patients[patientsToProcess[patient]].hasOwnProperty('stateID')
-          && (!patients[patientsToProcess[patient]].hasOwnProperty('certData')
-              || patients[patientsToProcess[patient]].certData.date !== today)) {
-        console.log("this patient would have been auto certed: ", patientsToProcess[patient]);
-        certPatientDOH(patientsToProcess[patient],'autoCert');
-        writeFacilityKeyToStorageApi();
-        break;
-      } else if ((patients[patientsToProcess[patient]].orderTimeStamp + 30000) < (new Date().getTime())) {
-        // patient without stateID still in queue after 30 seconds so look them up by name in MJ
-        await searchMJPatient(patients[patientsToProcess[patient]].compoundName);
-        console.log('this patient had state id looked up: ', patientsToProcess[patient]);
-        writeFacilityKeyToStorageApi();
-        break;
+  async function handlePeriodicAlarm(alarm) {
+    if (alarm.name === 'queue-thirty-sec-alarm') {
+      console.log('30 second periodic queue alarm triggered', alarm);
+      // process 1 patient every 30 seconds
+      let patientsToProcess = patientLists.seenToday.filter(patient => !patientLists.certedToday.includes(patient));
+      for (let patient in patientsToProcess) {
+        // using for in instead of .forEach because we only process a single patient per alarm
+        if (options['options'].autoCert === true
+            && patients[patientsToProcess[patient]].hasOwnProperty('stateID')
+            && (!patients[patientsToProcess[patient]].hasOwnProperty('certData')
+                || patients[patientsToProcess[patient]].certData.disposition !== 'problem')) {
+          console.log("this patient would have been auto certed: ", patientsToProcess[patient]);
+          certPatientDOH(patientsToProcess[patient], 'autoCert');
+          writeFacilityKeyToStorageApi();
+          break;
+        } else if ((patients[patientsToProcess[patient]].orderTimeStamp + 30000) < (new Date().getTime())) {
+          // patient without stateID still in queue after 30 seconds so look them up by name in MJ
+          await searchMJPatient(patients[patientsToProcess[patient]].compoundName);
+          console.log('this patient had state id looked up: ', patientsToProcess[patient]);
+          writeFacilityKeyToStorageApi();
+          break;
+        }
       }
+    }
+    else if (alarm.name === 'health-check-ten-min-alarm') {
+      console.log('health-check-ten-min-alarm: ', alarm);
     }
   }
 
