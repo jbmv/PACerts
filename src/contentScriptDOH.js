@@ -61,7 +61,8 @@ async function main() {
             const stateIDBox = document.getElementById('rn_patientid');
             const lastNameBox = document.getElementById('rn_patient_lastname');
             const dobBox = document.getElementById('rn_patient_dob');
-            if (stateIDBox.value !== '' || lastNameBox.value !== '' || dobBox.value !== '') {}
+            // reload page if these boxes aren't empty -- means we left the page in an invalid state
+            if (stateIDBox.value !== '' || lastNameBox.value !== '' || dobBox.value !== '') { window.location.reload(); }
             if (stateIDBox && lastNameBox && dobBox) {
                 // only run this code if we are on the cert page
                 sendResponse({'DOHSearchPatient': 'success'});

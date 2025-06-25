@@ -93,7 +93,7 @@ async function activate() {
       await chrome.storage.local.set({[facilityIDKey]: facilityID});
       chrome.runtime.onMessageExternal.addListener(handleExternalMessage);
       chrome.runtime.onMessage.addListener(handleInternalMessage);
-      await chrome.alarms.create('queue-alarm', {periodInMinutes: 1});
+      await chrome.alarms.create('queue-alarm', {periodInMinutes: 0.5});
       chrome.alarms.onAlarm.addListener(handlePeriodicAlarm);
       chrome.storage.local.onChanged.addListener(async (changes) => {
         if (changes['options']) {
@@ -319,6 +319,9 @@ async function activate() {
               if (!patientLists['certedToday'].includes(consumerID)) {
                 patientLists['certedToday'].push(consumerID);
               }
+              if (patientLists['problems'].includes(consumerID)) {
+                patientLists['problems'].splice(patientLists['problems'].indexOf(consumerID), 1);
+              }
             });
             writeFacilityKeyToStorageApi();
             break;
@@ -338,6 +341,7 @@ async function activate() {
               && !patientLists['certedToday'].includes(dohConsumerID)) {
             patientLists['certedToday'].push(dohConsumerID);
             patients[dohConsumerID]['certData'] = certData;
+            if (patientLists['problems'].includes(dohConsumerID)) { patientLists['problems'].splice(patientLists['problems'].indexOf(dohConsumerID), 1); }
             console.log('pateint marked as certed:', dohConsumerID);
             writeFacilityKeyToStorageApi();
             console.log('pateint marked as certed:', patients[dohConsumerID]);
@@ -401,7 +405,7 @@ async function activate() {
         reasons: ['AUDIO_PLAYBACK'],
         justification: 'Playing notification sounds',
       };
-      if (await chrome.offscreen.hasDocument()) return;
+      if (await chrome.offscreen.hasDocument()) { return; }
       await chrome.offscreen.createDocument(offscreenDocument);
     }
 
@@ -521,7 +525,7 @@ async function activate() {
             badgeCounter += badgeCounterIncognito;
             await chrome.action.setBadgeTextColor({...(badgeCounter === 0 ? {color: 'white'} : {color: 'red'})});
             await chrome.action.setBadgeText({...(badgeCounter === 0 ? {text: ''} : {text: badgeCounter.toString()})});
-            if (badgeCounter > oldCount) {
+            if (patientLists.problems.length > 0) {
               await createOffscreenDocument();
               await chrome.runtime.sendMessage({type: 'play-sound', sound: 'problemcert.mp3'}, response => {
                 if (chrome.runtime.lastError) {

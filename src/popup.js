@@ -259,6 +259,7 @@ document.addEventListener("DOMContentLoaded", function(e) {
                                 console.log('markCerted: message success', response);
                             }
                         })
+                        window.close();
                     })
                     showCompletedCheckbox.addEventListener('change', async function () {
                         if (this.checked) {
