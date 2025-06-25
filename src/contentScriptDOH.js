@@ -1,3 +1,6 @@
+// default options before loading from storage
+let options = { 'autocert': false }
+let limitationsToIgnore = ['None','none','no'];
 // Await document load
 document.addEventListener('DOMContentLoaded', function () {
     // After page load
@@ -5,22 +8,24 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 
 async function main() {
-    // wake up background service worker in case it was asleep
-    await chrome.runtime.sendMessage({ message: 'wakeup from contentScriptDOH' }, function (response) {
-        if (chrome.runtime.lastError) {
-            // no need to warn, just sending wakeup in case it's inactive
-            console.log( 'wakeup not received by background.js ', chrome.runtime.lastError.message );
-        } else if (response) {
-            console.info('wakeup sent: ', response);
+    if ((await chrome.storage.local.get('options')).hasOwnProperty('options')) {
+        options = (await chrome.storage.local.get('options')).options;
+    }
+    await sendHeartbeat();
+    // add listeners for internal messages and options changes
+    chrome.storage.local.onChanged.addListener(async (changes) => {
+        if (changes['options']) {
+            if ((await chrome.storage.local.get('options')).hasOwnProperty('options')) {
+                options = (await chrome.storage.local.get('options')).options;
+            }
         }
     });
-    // add listener for internal messages
     chrome.runtime.onMessage.addListener(handleInternalMessage);
     // send heartbeat to service worker every 25 seconds to keep it from going inactive
     setInterval(sendHeartbeat, 25000);
     // function definitions
     function handleInternalMessage(message, sender, sendResponse) {
-        console.log('contentScriptDOH received message for: ' + message.messageFunction);
+        console.log(`contentScriptDOH received message for: ${message.messageFunction} initiated by ${message.initiator}`);
         switch (message.messageFunction) {
             case 'DOHSearchPatient':
                 searchPatientDOH(message);
@@ -62,17 +67,61 @@ async function main() {
                 const observer = new MutationObserver((mutationsList, observer) => {
                     for (const mutation of mutationsList) {
                         if (mutation.type === 'childList') {
-                            console.log('A child node has been added or removed.');
                             observer.disconnect();
                             setTimeout(function () {
-                                // Code to be executed after 1 second
+                                // Code to be executed after 1 second -- need to wait for all cert data to be returned from xhttp request
                                 let certData = getCertData();
-                                formatCertData(certData);
+                                let date = new Date();
+                                let searchDate = String((date.getMonth() + 1)).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0') + '-' + date.getFullYear();
+                                let alreadyCertedToday = patientAlreadyCertedToday('insertDispNotesList',1,searchDate)
+                                formatCertData(certData,alreadyCertedToday);
                                 let noteTextArea = document.getElementById('dispensarynote');
                                 noteTextArea.focus();
                                 loadingDivs.forEach((div) => {
                                     div.remove();
                                 })
+                                // everything is done and formatted -- wait for save button to be clicked to send message back to background service worker to mark patient as certed
+                                waitForSaveButtonClick(consumerID, stateID, certData);
+                                // if autoCert is active, click the save button programatically after setting textArea to signature
+                                if (message.initiator === 'autoCert' && options.autoCert === true) {
+                                    if (!alreadyCertedToday
+                                        && limitationsToIgnore.includes(certData.limitations.trim().toLowerCase())
+                                        && certData.firstVisit === false
+                                        && certData.indications.length > 0) {
+                                        noteTextArea.value = "reviewed"; //TODO: replace this hard-coded 'reviewed' with signoff from options
+                                        console.log('padoh: auto-certing: ', consumerID);
+                                        const save = document.getElementsByClassName('medicalProfSave')[0];
+                                        save.click();
+                                        // reload page for new patient
+                                        window.location.reload();
+                                    } else {
+                                        let certProblem = 'Problem with Cert';
+                                        if (alreadyCertedToday) { certProblem = 'Already Certed Today'; }
+                                        if (!limitationsToIgnore.includes(certData.limitations.trim().toLowerCase())) { certProblem = 'Limitations'; }
+                                        if (certData.firstVisit) { certProblem = 'First Visit'; }
+                                        if (certData.indications.length === 0) { certProblem = 'Missing Indication'; }
+                                        certData.disposition = certProblem;
+                                        let message = {
+                                            messageFor: 'background.js',
+                                            messageSender: 'padoh',
+                                            consumerID: consumerID,
+                                            stateID: stateID,
+                                            certData: certData,
+                                        };
+                                        chrome.runtime.sendMessage(message, function (response) {
+                                            if (chrome.runtime.lastError) {
+                                                console.warn(
+                                                    'autocert: failed to send message:',
+                                                    chrome.runtime.lastError.message,
+                                                );
+                                            } else if (response) {
+                                                console.log('autoCert: response received: ', response);
+                                            }
+                                        });
+                                        // reload page for new patient
+                                        window.location.reload();
+                                    }
+                                }
                             }, 1000);
                         }
                     }
@@ -83,7 +132,6 @@ async function main() {
                     subtree: true, // Observe changes within the subtree
                 };
                 await observer.observe(targetNode, config);
-                waitForSaveButtonClick(consumerID, stateID);
             } else {
                 sendResponse({'DOHSearchPatient': 'failed -- element not present...logged in?'});
             }
@@ -101,9 +149,9 @@ async function main() {
                 // wait 1 second for certs to load
                 setTimeout(function () {
                     let certificateCheckboxes = document.querySelectorAll("td[id*='CertificateStatus']")
-                    certificateCheckboxes.forEach(checkbox => {
-                        if (checkbox.innerHTML === 'Active') { checkbox.nextElementSibling.firstElementChild.click(); return;}
-                    })
+                    for (const checkbox of certificateCheckboxes) {
+                        if (checkbox.innerHTML === 'Active') { checkbox.nextElementSibling.firstElementChild.click(); break;}
+                    }
                 },1000)
             }
             function goToSectionSix() {
@@ -126,6 +174,8 @@ async function main() {
                 });
             }
             function getCertData() {
+                let date = new Date();
+                let today = date.getFullYear() + '-' + String((date.getMonth() + 1)).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
                 let SMCs = {
                     SMC_1: 'ALS',
                     SMC_22: 'Anxiety',
@@ -177,29 +227,64 @@ async function main() {
                     limitations = document.getElementById('anylimitationtext').value;
                 }
                 return {
+                    date: today,
                     limitations: limitations,
                     indications: indications,
                     firstVisit: isFirstVisit,
                 };
             }
-            async function formatCertData(certData) {
+            async function formatCertData(certData,alreadyCertedToday) {
                 console.log(certData);
                 let url = chrome.runtime.getURL('DOHbanner.html');
                 let banner = await fetch(url).then(res => res.text());
                 let dispTextArea = document.getElementById('dispensarynote');
                 let label = dispTextArea.previousElementSibling;
                 label.insertAdjacentHTML('beforebegin', banner)
+                if (alreadyCertedToday) {
+                    let alreadyCertedDiv = document.getElementById('already-certed-today');
+                    alreadyCertedDiv.classList.remove('hidden');
+                }
                 let limitations = document.getElementById('limitations')
                 let firstVisit = document.getElementById('first-visit');
                 let indications = document.getElementById('indications');
                 limitations.innerHTML = "Limitations: " + certData.limitations;
                 firstVisit.innerHTML = "First Visit: " + (certData.firstVisit ? "YES" : "No");
                 indications.innerHTML = "Indications: " + certData.indications.join(", ");
-                if (certData.limitations !== 'None') { limitations.classList.add('mark'); limitations.setAttribute('style', "font-weight: bolder; color: red;");}
+                if (!limitationsToIgnore.includes(certData.limitations.trim().toLowerCase())) { limitations.classList.add('mark'); limitations.setAttribute('style', "font-weight: bolder; color: red;");}
                 if (certData.firstVisit) { firstVisit.classList.add('mark'); firstVisit.setAttribute('style', "font-weight: bolder; color: red;");}
                 if (certData.indications.length === 0) { indications.classList.add('mark'); indications.setAttribute('style', "font-weight: bolder; color: red;");}
             }
-            function waitForSaveButtonClick(consumerID, stateID) {
+            function patientAlreadyCertedToday(tableId, columnIndex, searchTerm) {
+                    // Get the table element by its ID.
+                    const table = document.getElementById(tableId);
+                    // If the table doesn't exist, exit the function.
+                    if (!table) {
+                        console.error(`Table with ID "${tableId}" not found.`);
+                        return true;
+                    }
+                    // Get all table rows, excluding the header (thead) if present.
+                    const rows = table.querySelectorAll('tbody tr'); // Assuming a tbody is used.
+                    // Convert the search term to lowercase for case-insensitive comparison.
+                    const lowerCaseSearchTerm = searchTerm.toLowerCase();
+                    // Iterate through each table row.
+                for (const row of rows) {
+                    // for...of used because we want to break after first return and .forEach does not allow that
+                    // Get all cells within the current row.
+                    const cells = row.cells;
+                    // Check if the specified column index is valid.
+                    if (columnIndex >= 0 && columnIndex < cells.length) {
+                        // Get the text content of the cell in the specified column.
+                        const cellText = cells[columnIndex].textContent.toLowerCase();
+                        // Check if the cell content contains the search term.
+                        if (cellText.includes(lowerCaseSearchTerm)) {
+                            // If there's a match, return true.
+                            return true;
+                        }
+                    }
+                }
+                return false;
+            }
+            function waitForSaveButtonClick(consumerID, stateID, certData) {
                 // listen for the save button to be clicked, then tell background service worker to mark the patietn certed
                 const save = document.getElementsByClassName('medicalProfSave')[0];
                 save.addEventListener('click', function () {
@@ -209,11 +294,13 @@ async function main() {
                         consumerID,
                         stateID,
                     );
+                    certData.disposition = 'certed'
                     let message = {
                         messageFor: 'background.js',
                         messageSender: 'padoh',
                         consumerID: consumerID,
                         stateID: stateID,
+                        certData: certData,
                     };
                     chrome.runtime.sendMessage(message, function (response) {
                         if (chrome.runtime.lastError) {
@@ -242,24 +329,31 @@ async function main() {
         }
     }
     function sendHeartbeat() {
+        let currentURL = window.location.href;
         let message = {
             'message': 'heartbeat',
-            'messageSender': 'DOH content script'
+            'messageSender': 'DOH content script',
+            'url': currentURL,
+            'timeStamp': Date.now()
         };
         try {
             chrome.runtime.sendMessage(message, function (response) {
                 if (chrome.runtime.lastError) {
-                    console.warn(
+                    // reload page if can't send heartbeat
+                    console.log(
                         'Error sending heartbeat from content script: ',
                         chrome.runtime.lastError.message,
                     );
+                    window.location.reload();
                 } else if (response) {
                     console.info('heartbeat heard: ', response);
                 }
             });
         }
         catch (e) {
-            console.warn('error sending heartbeat: ', e);
+            // reload page if can't send heartbeat
+            console.log('error sending heartbeat: ', e);
+            window.location.reload();
         }
     }
 }

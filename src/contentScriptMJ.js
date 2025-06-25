@@ -17,14 +17,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
 async function main() {
     // wake up background service worker in case it was asleep
-    await chrome.runtime.sendMessage({ message: 'wakeup' }, function (response) {
-        if (chrome.runtime.lastError) {
-            // no need to warn, just sending wakeup in case it's inactive
-            console.log( 'wakeup not received by background.js ', chrome.runtime.lastError.message );
-        } else if (response) {
-            console.info('wakeup sent: ', response);
-        }
-    });
+    await sendHeartbeat();
     // add listener for internal messages
     chrome.runtime.onMessage.addListener(handleInternalMessage);
     // send heartbeat to service worker every 25 seconds to keep it from going inactive
@@ -57,24 +50,31 @@ async function main() {
         }
     }
     function sendHeartbeat() {
+        currentUrl = window.location.href;
         let message = {
             'message': 'heartbeat',
-            'messageSender': 'MJ content script'
+            'messageSender': 'MJ content script',
+            'url': currentUrl,
+            'timeStamp': Date.now()
         };
         try {
             chrome.runtime.sendMessage(message, function (response) {
                 if (chrome.runtime.lastError) {
-                    console.warn(
+                    // reload page if can't send message to background service worker
+                    console.log(
                         'Error sending heartbeat from content script: ',
                         chrome.runtime.lastError.message,
                     );
+                    window.location.reload();
                 } else if (response) {
                     console.info('heartbeat heard: ', response);
                 }
             });
         }
         catch (e) {
-            console.warn('error sending heartbeat: ', e);
+            // reload page if can't send heartbeat
+            console.log('error sending heartbeat: ', e);
+            window.location.reload();
         }
     }
 }

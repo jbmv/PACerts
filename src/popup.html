@@ -31,7 +31,21 @@
     <title>PACerts</title>
 </head>
 <body>
-<div id="extension-not-initialized" class="d-none container display-6 m-3 text-center"><div class="container"><b>MJFreeway Not Found</b></div><div class="container small display-6"><small>Please refresh MJ pages or login to MJ</small></div></div>
+<div id="banner" class="container border-bottom fs-6 mt-2 d-none">
+    <div class="row justify-content-between mb-2">
+        <div id="facility" class="col-4 d-flex align-items-center text-nowrap">
+            Facility:
+        </div>
+        <div class="col-8 d-flex align-items-center justify-content-end">
+            App Status:
+            <div id="MJQ-status" class="btn btn-danger opacity-50 d-inline-block p-1 align-items-center py-0 mb-0 mx-2">MJ Queue</div>
+            <div id="MJP-status" class="btn btn-danger opacity-50 d-inline-block p-1 align-items-center py-0 mb-0 mx-2">MJ Patients</div>
+            <div id="DOH-status" class="btn btn-danger opacity-50 d-inline-block p-1 align-items-center py-0 mb-0 mx-2">DOH</div>
+        </div>
+    </div>
+</div>
+<div id="extension-not-initialized" class="d-none container display-6 m-3 text-center"><div class="container"><b>MJ Not Found</b></div><div class="container small display-6"><small>Please refresh MJ pages or <a id="mj-login" href="#">login</a> to MJ</small></div></div>
+
 <div class="container-fluid">
 <table id="to-cert-table" class="table table-sm dataTable"></table>
 </div>
@@ -41,8 +55,14 @@
             <div id="mark-completed-div"></div>
         </div>
         <div class="col-9 d-flex justify-content-end">
-            <button id="reports-button" class="mx-3 btn btn-sm btn-outline-secondary">Daily Report</button>
-            <button id="options-button" class="btn btn-sm btn-outline-secondary">Options</button>
+            <button id="reports-button" class="mx-2 btn btn-sm btn-outline-secondary d-none">Daily Report</button>
+            <button id="options-button" class="mx-2 btn btn-sm btn-outline-secondary d-none">Options</button>
+            <div class="d-flex align-items-center flex-row-reverse ml-2 d-none">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" role="switch" id="auto-cert-switch">
+                    <label class="form-check-label" for="auto-cert-switch">Auto Cert</label>
+                </div>
+            </div>
         </div>
     </div>
 </div>
