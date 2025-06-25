@@ -1,3 +1,6 @@
+const isIncognitoMode = chrome.extension.inIncognitoContext;
+const facilityIDKey = isIncognitoMode ? 'facilityID-incognito' : 'facilityID';
+const stateKey = isIncognitoMode ? 'state-incognito' : 'state';
 let currentUrl = window.location.href;
 // Inject script into MJ page to extend xhttp requests so we can grab response data for processing
 if (currentUrl.indexOf('mjplatform.com') !== -1) {
@@ -8,12 +11,27 @@ if (currentUrl.indexOf('mjplatform.com') !== -1) {
     };
     (document.head || document.documentElement).appendChild(s);
 }
-// Await page load
+
+// default options before loading from storage
+let options = { 'autocert': false }
+let limitationsToIgnore = ['None','none','no'];
+
+// Await document load
 document.addEventListener('DOMContentLoaded', function () {
     // After page load
-    currentUrl = window.location.href;
-    main();
+    chrome.runtime.onMessage.addListener(handleStateChange);
+    chrome.storage.local.get(stateKey).then(state => {
+        if (state['state'] !== 'await activation') {
+            main();
+        }
+    })
 });
+
+async function handleStateChange(message) {
+    if (message.messageFunction === 'activate') {
+        window.location.reload();
+    }
+}
 
 async function main() {
     // wake up background service worker in case it was asleep
@@ -65,16 +83,13 @@ async function main() {
                         'Error sending heartbeat from content script: ',
                         chrome.runtime.lastError.message,
                     );
-                    window.location.reload();
                 } else if (response) {
                     console.info('heartbeat heard: ', response);
                 }
             });
         }
         catch (e) {
-            // reload page if can't send heartbeat
             console.log('error sending heartbeat: ', e);
-            window.location.reload();
         }
     }
 }

@@ -64,9 +64,7 @@ const extensionID = "pknjbljkccmnjiibcmjiefofiaopbcnl";
                                         ...(order.hasOwnProperty('created_at') && { orderDate: order.created_at.substring(0, 10) })
                                     }, function(response)  {
                                         if (chrome.runtime.lastError) {
-                                            // reload page if message not received by background service worker
-                                            console.log("InjectMJ: processOpenOrdersResponse response not heard, reloading page", chrome.runtime.lastError.message);
-                                            window.location.reload();
+                                            console.log("InjectMJ: processOpenOrdersResponse - no response from background :", chrome.runtime.lastError.message);
                                         } else if (response) {
                                             console.log("injectMJ: received response : ", response);
                                         }
@@ -104,9 +102,7 @@ const extensionID = "pknjbljkccmnjiibcmjiefofiaopbcnl";
                             }
                             chrome.runtime.sendMessage(extensionID, message, function(response) {
                                 if (chrome.runtime.lastError) {
-                                    // reload page if message not heard
                                     console.log("InjectMJ: processMJPatientResponse:", chrome.runtime.lastError.message);
-                                    window.location.reload();
                                 } else if (response) {
                                     console.log("injectMJ processPatientResponse response received: ", response);
                                 }
@@ -143,9 +139,7 @@ const extensionID = "pknjbljkccmnjiibcmjiefofiaopbcnl";
                         },
                         function (response) {
                             if (chrome.runtime.lastError) {
-                                // reload page if message not heard
                                 console.log("InjectMJ: processMJDailyTransactionsResponse:", chrome.runtime.lastError.message);
-                                window.location.reload();
                             } else if (response) {
                                 console.log("injectMJ processDailyTransactionsResponse recieved response:", response);
                             }

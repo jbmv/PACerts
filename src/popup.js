@@ -33,7 +33,26 @@ document.addEventListener("DOMContentLoaded", function(e) {
         //function definitions
         function extensionNotInitialized() {
             document.getElementById('extension-not-initialized').classList.remove('d-none');
+            document.getElementById('activate-link').addEventListener('click', (e) => {
+                chrome.runtime.sendMessage({'messageFunction': 'activate'},
+                    function (response) {
+                        if (chrome.runtime.lastError) {
+                            console.log('activate: ', chrome.runtime.lastError);
+                        } else if (response) {
+                            console.log("activate: ", response);
+                        }
+                    })
+                window.close();
+            })
             document.getElementById('mj-login').addEventListener('click', (e) => {
+                chrome.runtime.sendMessage({'messageFunction': 'activate'},
+                    function (response) {
+                        if (chrome.runtime.lastError) {
+                            console.log('activate: ', chrome.runtime.lastError);
+                        } else if (response) {
+                            console.log("activate: ", response);
+                        }
+                    })
                 chrome.tabs.create({url: 'https://app.mjplatform.com/login', active: true});
             })
         }
@@ -201,7 +220,7 @@ document.addEventListener("DOMContentLoaded", function(e) {
                         chrome.runtime.sendMessage(message,
                             function (response) {
                                 if (chrome.runtime.lastError) {
-                                    console.warn('addButtonListeners: error sending message: ', chrome.runtime.lastError);
+                                    console.warn('table click: error sending message: ', chrome.runtime.lastError);
                                 } else if (response) {
                                     console.log("addButtonListeners received response: ", response);
                                 }
@@ -258,6 +277,9 @@ document.addEventListener("DOMContentLoaded", function(e) {
                             await chrome.tabs.create({url: 'https://app.mjplatform.com/queue/payment', active: true});
                         } else {
                             await chrome.tabs.update(tabs[0].id, {active: true});
+                            if (this.classList.contains('btn-danger')) {
+                                await chrome.tabs.sendMessage(tabs[0].id, {'messageFunction': 'activate'});
+                            }
                         }
                     })
                     document.getElementById('MJP-status').addEventListener('click', async function () {
@@ -266,6 +288,9 @@ document.addEventListener("DOMContentLoaded", function(e) {
                             await chrome.tabs.create({url: 'https://app.mjplatform.com/patients', active: true});
                         } else {
                             await chrome.tabs.update(tabs[0].id, {active: true});
+                            if (this.classList.contains('btn-danger')) {
+                                await chrome.tabs.sendMessage(tabs[0].id, {'messageFunction': 'activate'});
+                            }
                         }
                     })
                     document.getElementById('DOH-status').addEventListener('click', async function () {
@@ -274,6 +299,10 @@ document.addEventListener("DOMContentLoaded", function(e) {
                             await chrome.tabs.create({url: 'https://padohmmp.custhelp.com/app/patient-certifications-med', active: true});
                         } else {
                             await chrome.tabs.update(tabs[0].id, {active: true});
+                            if (this.classList.contains('btn-danger')) {
+                                await chrome.tabs.sendMessage(tabs[0].id, {'messageFunction': 'activate'});
+                            }
+
                         }
                     })
                     // reload page if any local data changes occur
