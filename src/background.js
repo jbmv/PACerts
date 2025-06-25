@@ -85,7 +85,6 @@ async function activate() {
       // Init complete: change state to running, store state in local storage, add listeners with handlers below to await incoming messages in running state
       state = 'running';
       console.log(`Extension running with incognito: ${isIncognitoMode}, and facilityID: ${facilityID}`);
-      // create offscreen document to handle notification sounds
       updateBadgeCounter();
       // give 3 min grace period to get all pages working
       lastHeartbeats = { 'doh': Date.now() + 180000, 'mjQueue': Date.now() + 180000, 'mjSearch': Date.now() + 60000 };
@@ -523,6 +522,7 @@ async function activate() {
             await chrome.action.setBadgeTextColor({...(badgeCounter === 0 ? {color: 'white'} : {color: 'red'})});
             await chrome.action.setBadgeText({...(badgeCounter === 0 ? {text: ''} : {text: badgeCounter.toString()})});
             if (badgeCounter > oldCount) {
+              await createOffscreenDocument();
               await chrome.runtime.sendMessage({type: 'play-sound', sound: 'problemcert.mp3'}, response => {
                 if (chrome.runtime.lastError) {
                   console.log('error playing sound: ', chrome.runtime.lastError.message);
@@ -557,6 +557,7 @@ async function activate() {
             await chrome.action.setBadgeTextColor({...(badgeCounter === 0 ? {color: 'white'} : {color: 'red'})});
             await chrome.action.setBadgeText({...(badgeCounter === 0 ? {text: ''} : {text: badgeCounter.toString()})});
             if (badgeCounter > oldCount) {
+              await createOffscreenDocument();
               await chrome.runtime.sendMessage({type: 'play-sound', sound: 'problemcert.mp3'}, response => {
                 if (chrome.runtime.lastError) {
                   console.log('error playing sound: ', chrome.runtime.lastError.message);
@@ -600,5 +601,6 @@ async function activate() {
         }
       }, 2000);
     }
+
   }
 }
