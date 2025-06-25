@@ -38,7 +38,7 @@
     "unlimitedStorage",
     "tabs",
     "webRequest",
-    "clipboardWrite"
+    "offscreen"
   ],
   "update_url": "https://clients2.google.com/service/update2/crx",
   "version": "1.1",

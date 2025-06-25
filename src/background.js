@@ -10,9 +10,17 @@ let date = new Date();
 let today = date.getFullYear() + '-' + String((date.getMonth() + 1)).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
 let patients = {};
 let patientLists = {};
-let options = {}
+let lastHeartbeats = {};
+let healthStatus = {
+  doh: false,
+  mjSearch: false,
+  mjQueue: false
+};
+// default options before loading from storage
+let options = { 'autoCert': false, 'openPages': false };
 // set state in local storage and await initialization message from MJ to know which facility to load from local storage
 chrome.action.setIcon({path:'icons/icon32-red.png'});
+chrome.storage.local.set({healthStatus: healthStatus});
 chrome.storage.local.set({ [stateKey]: state });
 console.log('state set to: initializing, context incogito :', isIncognitoMode);
 chrome.runtime.onMessageExternal.addListener(initializeExtension);
@@ -26,19 +34,15 @@ async function initializeExtension(message, sender, sendResponse) {
   // all code for initialization runs in the next if block
   if (message.facilityID && (state === 'initializing')) {
     state = 'loading';
-    options = await chrome.storage.local.get('options'); //TODO: implement real options
+    if ((await chrome.storage.local.get('options')).hasOwnProperty('options')) {
+      options = (await chrome.storage.local.get('options')).options;
+    }
+    // autocert is always off to start unless user explicitly turns it on in popup -- regardless of what is in local storage key
+    options.autoCert = false;
+    await chrome.storage.local.set({'options':options});
     // remove initialization listeners
     chrome.runtime.onMessageExternal.removeListener(initializeExtension);
     chrome.runtime.onMessage.removeListener(initializeExtension);
-    // if facility name is available, set it so we can use it to look up the names for the facility name in the popup
-    /*
-    if (message.facilityName) { // this only works uner /api/login
-
-      let facilityIDsToNames = await chrome.storage.local.get(['facilityIDsToNames']);
-      facilityIDsToNames['facilityIDsToNames'][facilityID] = message.facilityName ? message.facilityName : 'None';
-      await chrome.storage.local.set({ facilityIDsToNames: facilityIDsToNames['facilityIDsToNames'] });
-    }
-     */
     // check date hasn't changed since chrome opened
     date = new Date();
     today = date.getFullYear() + '-' + String((date.getMonth() + 1)).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
@@ -49,23 +53,32 @@ async function initializeExtension(message, sender, sendResponse) {
     patientLists = (data.hasOwnProperty(facilityID) && data[facilityID].hasOwnProperty("PatientLists") && data[facilityID]['PatientLists']['date'] === today) ? data[facilityID].PatientLists : {
       'date': today,
       'seenToday': [],
-      'certedToday': []
+      'certedToday': [],
+      'problems': []
     };
+    // must update local storage in case this facility never existed before
+    writeFacilityKeyToStorageApi();
     // Init complete: change state to running, store state in local storage, add listeners with handlers below to await incoming messages in running state
     state = 'running';
     console.log(`Extension running with incognito: ${isIncognitoMode}, and facilityID: ${facilityID}`);
+    // create offscreen document to handle notification sounds
     updateBadgeCounter();
     await chrome.action.setIcon({path: 'icons/icon32.png'})
     await chrome.storage.local.set({[stateKey]: state});
     await chrome.storage.local.set({[facilityIDKey]: facilityID});
     chrome.runtime.onMessageExternal.addListener(handleExternalMessage);
     chrome.runtime.onMessage.addListener(handleInternalMessage);
-    await chrome.alarms.create('queue-thirty-sec-alarm', {periodInMinutes: 0.5});
+    await chrome.alarms.create('queue-alarm', {periodInMinutes: 0.25});
     await chrome.alarms.create('health-check-ten-min-alarm', {periodInMinutes: 10});
     chrome.alarms.onAlarm.addListener(handlePeriodicAlarm);
+    chrome.storage.local.onChanged.addListener(async (changes) => {
+      if (changes['options']) {
+        options = (await chrome.storage.local.get('options')).options;
+        updateBadgeCounter();
+      }
+    })
     // let's open or refresh all MJ and DOH pages as well -- since something caused the extension to reload -- also it's nice to open all the pages automatically
-    // TODO options page entry for auto page open preferences
-    await openWorkingPages();
+    if (options.openPages) { await openWorkingPages(); }
     sendResponse({'response': 'success', 'state': 'running'});
   } else {
     sendResponse({'response': 'failure', 'state': 'initializing'});
@@ -242,7 +255,17 @@ async function initializeExtension(message, sender, sendResponse) {
   async function handleInternalMessage(message, sender, sendResponse) {
     console.log('internal message received: ', message);
     if (message.message === 'heartbeat') {
+      if (message.url.indexOf('mjplatform.com/queue') !== -1) {
+        lastHeartbeats.mjQueue = message.timeStamp;
+      }
+      else if (message.url.indexOf('mjplatform.com/patients') !== -1) {
+        lastHeartbeats.mjSearch = message.timeStamp;
+      }
+      else if (message.url.indexOf('app/patient-certifications-med') !== -1) {
+        lastHeartbeats.doh = message.timeStamp;
+      }
       sendResponse({'heartbeat': 'reply from background.js'});
+      await checkHealth();
     }
     if (message.messageFor !== 'background.js') {
       sendResponse({'success': true});
@@ -253,7 +276,7 @@ async function initializeExtension(message, sender, sendResponse) {
         processPopUpClick(message);
         break;
       case 'padoh':
-        processPatientCerted(message.stateID, message.consumerID, message.certData, message.disposition);
+        processPatientCerted(message.stateID, message.consumerID, message.certData);
         break;
       default:
         console.warn('No handler for internal sender: ', message.messageSender);
@@ -284,39 +307,48 @@ async function initializeExtension(message, sender, sendResponse) {
       }
     }
 
-    function processPatientCerted(dohStateID, dohConsumerID, certData, disposition) {
-      if (disposition === 'problem') {
-        patients[dohConsumerID]['certData'] = certData;
-        writeFacilityKeyToStorageApi();
-      } else
-      if (patients[dohConsumerID]
-          && patients[dohConsumerID].stateID === dohStateID
-          && !patientLists['certedToday'].includes(dohConsumerID))
-      {
+    async function processPatientCerted(dohStateID, dohConsumerID, certData) {
+      if (certData.disposition === 'certed') {
+        if (patients[dohConsumerID]
+            && patients[dohConsumerID].stateID === dohStateID
+            && !patientLists['certedToday'].includes(dohConsumerID)) {
           patientLists['certedToday'].push(dohConsumerID);
           patients[dohConsumerID]['certData'] = certData;
           console.log('pateint marked as certed:', dohConsumerID);
           writeFacilityKeyToStorageApi();
+          console.log('pateint marked as certed:', patients[dohConsumerID]);
+        } else {
+          console.error('processPatientCerted: no match on patient with doh sent:', dohConsumerID, dohStateID);
         }
-      else {
-        console.error('processPatientCerted: no match on patient with doh sent:', dohConsumerID, dohStateID);
+      } else {
+        patients[dohConsumerID]['certData'] = certData;
+        patientLists['problems'].push(dohConsumerID);
+        await createOffscreenDocument();
+        await chrome.runtime.sendMessage({type: 'play-sound', sound: 'problemcert.mp3'});
+        writeFacilityKeyToStorageApi();
+
       }
     }
   }
 
+  // function definitions -- alarms and offscreen document for notification sounds
   async function handlePeriodicAlarm(alarm) {
-    if (alarm.name === 'queue-thirty-sec-alarm') {
-      console.log('30 second periodic queue alarm triggered', alarm);
-      // process 1 patient every 30 seconds
+    if (alarm.name === 'queue-alarm') {
+      console.log('15 second periodic queue alarm triggered', alarm);
+      let healthCheck = await checkHealth();
+      if (healthCheck === 'failed') {
+        await createOffscreenDocument();
+        await chrome.runtime.sendMessage({type: 'play-sound', sound: 'healthcheckfail.mp3'});
+      }
+      // process 1 patient every 15 seconds
       let patientsToProcess = patientLists.seenToday.filter(patient => !patientLists.certedToday.includes(patient));
       for (let patient in patientsToProcess) {
         // using for in instead of .forEach because we only process a single patient per alarm
-        if (options['options'].autoCert === true
+        if (options.autoCert === true
             && patients[patientsToProcess[patient]].hasOwnProperty('stateID')
-            && (!patients[patientsToProcess[patient]].hasOwnProperty('certData') || patients[patientsToProcess[patient]].certData.disposition !== 'problem')) {
-          console.log("this patient would have been auto certed: ", patientsToProcess[patient]);
-          // certPatientDOH(patientsToProcess[patient], 'autoCert');
-          // writeFacilityKeyToStorageApi();
+            && (!patients[patientsToProcess[patient]].hasOwnProperty('certData') || patients[patientsToProcess[patient]].certData.date !== today)) {
+          console.log("auto certing: ", patientsToProcess[patient]);
+          certPatientDOH(patientsToProcess[patient], 'autoCert');
           // break out of for loop -- only process 1 patient per alarm
           break;
         } else if (((patients[patientsToProcess[patient]].orderTimeStamp + 30000) < (new Date().getTime()))
@@ -324,7 +356,6 @@ async function initializeExtension(message, sender, sendResponse) {
           // patient without stateID still in queue after 30 seconds so look them up by name in MJ
           await searchMJPatient(patients[patientsToProcess[patient]].compoundName);
           console.log('this patient had state id looked up: ', patientsToProcess[patient]);
-          writeFacilityKeyToStorageApi();
           // break out of for loop -- only process 1 patient per alarm
           break;
         }
@@ -333,6 +364,16 @@ async function initializeExtension(message, sender, sendResponse) {
     else if (alarm.name === 'health-check-ten-min-alarm') {
       console.log('health-check-ten-min-alarm: ', alarm);
     }
+  }
+
+  async function createOffscreenDocument() {
+    const offscreenDocument = {
+      url: 'offscreen.html',
+      reasons: ['AUDIO_PLAYBACK'],
+      justification: 'Playing notification sounds',
+    };
+    if (await chrome.offscreen.hasDocument()) return;
+    await chrome.offscreen.createDocument(offscreenDocument);
   }
 
   //function definitions -- these need to be accessible for both internal and external message handling
@@ -356,6 +397,7 @@ async function initializeExtension(message, sender, sendResponse) {
     };
     let tabs = await chrome.tabs.query({url: 'https://*.mjplatform.com/*patients*'});
     if (tabs.length === 0) {
+      /* don't do this anymore, it's annoying
       //open new MJ patient details page since one not open
       await chrome.tabs.create({url: 'https://app.mjplatform.com/patients', active: true});
       tabs = await chrome.tabs.query({url: 'https://*.mjplatform.com/*'});
@@ -364,6 +406,9 @@ async function initializeExtension(message, sender, sendResponse) {
           console.warn('openMJPatientPage: error sending message, receiver doesnt exist ', chrome.runtime.lastError);
         }
       });
+       */
+      lastHeartbeats.mjSearch = 1;
+      await checkHealth();
     } else {
       await chrome.tabs.sendMessage(tabs[0].id, message, response => {
         if (chrome.runtime.lastError) {
@@ -387,7 +432,7 @@ async function initializeExtension(message, sender, sendResponse) {
   }
 
   async function certPatientDOH(consumerID, initiator) {
-    let tabs = await chrome.tabs.query({url: 'https://*.padohmmp.custhelp.com/*'});
+    let tabs = await chrome.tabs.query({url: '*://*.padohmmp.custhelp.com/app/patient-certifications-med*'});
     let patient = {
       birthDate: patients[consumerID].birthDate,
       stateID: patients[consumerID].stateID,
@@ -401,6 +446,7 @@ async function initializeExtension(message, sender, sendResponse) {
       'initiator': initiator
     };
     if (tabs.length === 0) {
+      /* used to do this, auto open pages is annoying though
       //open new doh page in a tab if one isn't already open
       await chrome.tabs.create({url: 'https://padohmmp.custhelp.com/app/patient-certifications-med', active: true});
       tabs = await chrome.tabs.query({url: 'https://padohmmp.custhelp.com/*'});
@@ -409,6 +455,10 @@ async function initializeExtension(message, sender, sendResponse) {
           console.warn('openDOHpage: error sending message, receiver doesnt exist ', chrome.runtime.lastError);
         }
       });
+       */
+      console.log('doh page not found -- flagging');
+      lastHeartbeats.doh = 1;
+      await checkHealth();
     } else {
       // handle patient DOH pasting
       // make tab active if manually clicked on, otherwise do it in background if autoCert
@@ -422,34 +472,80 @@ async function initializeExtension(message, sender, sendResponse) {
   }
 
   async function updateBadgeCounter() {
-    // TODO: autoCert should only flag those with certData (problems) -- need to replace this janky code with a better solution -- also check to see if running is true in both modes first
     // start with counter = 0 for both
     let badgeCounter = 0;
     let badgeCounterIncognito = 0;
-    if (isIncognitoMode === false) {
-      // set badgeCounter from value in memory and load incognito data to set badgeCounterIncognito
-      badgeCounter = patientLists['seenToday'].length - patientLists['certedToday'].length;
-      let incognitoFacilityID = await chrome.storage.local.get('facilityID-incognito');
-      if (incognitoFacilityID['facilityID-incognito']) {
-        let incognitoPatientLists = await chrome.storage.local.get(incognitoFacilityID['facilityID-incognito']);
-        if ((incognitoPatientLists[incognitoFacilityID['facilityID-incognito']]['PatientLists'] && incognitoPatientLists[incognitoFacilityID['facilityID-incognito']]['PatientLists']['date']) && incognitoPatientLists[incognitoFacilityID['facilityID-incognito']]['PatientLists']['date'] === today) {
-          badgeCounterIncognito = incognitoPatientLists[incognitoFacilityID['facilityID-incognito']]['PatientLists']['seenToday'].length - incognitoPatientLists[incognitoFacilityID['facilityID-incognito']]['PatientLists']['certedToday'].length;
+    switch (options.autoCert) {
+      case true:
+        if (isIncognitoMode === false) {
+          // set badgeCounter from value in memory and load incognito data to set badgeCounterIncognito
+          badgeCounter = patientLists['problems'].length;
+          let incognitoFacilityID = await chrome.storage.local.get('facilityID-incognito');
+          if (incognitoFacilityID['facilityID-incognito']) {
+            let incognitoPatientLists = await chrome.storage.local.get(incognitoFacilityID['facilityID-incognito']);
+            if ((incognitoPatientLists[incognitoFacilityID['facilityID-incognito']]['PatientLists'] && incognitoPatientLists[incognitoFacilityID['facilityID-incognito']]['PatientLists']['date']) && incognitoPatientLists[incognitoFacilityID['facilityID-incognito']]['PatientLists']['date'] === today) {
+              badgeCounterIncognito = incognitoPatientLists[incognitoFacilityID['facilityID-incognito']]['PatientLists']['problems'].length;
+            }
+          }
+        } else {
+          // set badgeCounterIncognito from value in memory and load non-incognito data to set badgeCounter
+          badgeCounterIncognito = patientLists['problems'].length;
+          let facilityID = await chrome.storage.local.get('facilityID');
+          if (facilityID['facilityID']) {
+            let notIncogPtList = await chrome.storage.local.get(facilityID['facilityID']);
+            if ((notIncogPtList[facilityID['facilityID']]['PatientLists'] && notIncogPtList[facilityID['facilityID']]['PatientLists']['date']) && notIncogPtList[facilityID['facilityID']]['PatientLists']['date'] === today) {
+              badgeCounter = notIncogPtList[facilityID['facilityID']]['PatientLists']['problems'].length;
+            }
+          }
         }
-      }
-    } else {
-      // set badgeCounterIncognito from value in memory and load non-incognito data to set badgeCounter
-      badgeCounterIncognito = patientLists['seenToday'].length - patientLists['certedToday'].length;
-      let facilityID = await chrome.storage.local.get('facilityID');
-      if (facilityID['facilityID']) {
-        let notIncogPtList = await chrome.storage.local.get(facilityID['facilityID']);
-        if ((notIncogPtList[facilityID['facilityID']]['PatientLists'] && notIncogPtList[facilityID['facilityID']]['PatientLists']['date']) && notIncogPtList[facilityID['facilityID']]['PatientLists']['date'] === today) {
-          badgeCounter = notIncogPtList[facilityID['facilityID']]['PatientLists']['seenToday'].length - notIncogPtList[facilityID['facilityID']]['PatientLists']['certedToday'].length;
+        badgeCounter += badgeCounterIncognito;
+        await chrome.action.setBadgeTextColor({...(badgeCounter === 0 ? {color: 'white'} : {color: 'red'})});
+        await chrome.action.setBadgeText({...(badgeCounter === 0 ? {text: ''} : {text: badgeCounter.toString()})});
+        break;
+      case false:
+        // start with counter = 0 for both
+        if (isIncognitoMode === false) {
+          // set badgeCounter from value in memory and load incognito data to set badgeCounterIncognito
+          badgeCounter = patientLists['seenToday'].length - patientLists['certedToday'].length;
+          let incognitoFacilityID = await chrome.storage.local.get('facilityID-incognito');
+          if (incognitoFacilityID['facilityID-incognito']) {
+            let incognitoPatientLists = await chrome.storage.local.get(incognitoFacilityID['facilityID-incognito']);
+            if ((incognitoPatientLists[incognitoFacilityID['facilityID-incognito']]['PatientLists'] && incognitoPatientLists[incognitoFacilityID['facilityID-incognito']]['PatientLists']['date']) && incognitoPatientLists[incognitoFacilityID['facilityID-incognito']]['PatientLists']['date'] === today) {
+              badgeCounterIncognito = incognitoPatientLists[incognitoFacilityID['facilityID-incognito']]['PatientLists']['seenToday'].length - incognitoPatientLists[incognitoFacilityID['facilityID-incognito']]['PatientLists']['certedToday'].length;
+            }
+          }
+        } else {
+          // set badgeCounterIncognito from value in memory and load non-incognito data to set badgeCounter
+          badgeCounterIncognito = patientLists['seenToday'].length - patientLists['certedToday'].length;
+          let facilityID = await chrome.storage.local.get('facilityID');
+          if (facilityID['facilityID']) {
+            let notIncogPtList = await chrome.storage.local.get(facilityID['facilityID']);
+            if ((notIncogPtList[facilityID['facilityID']]['PatientLists'] && notIncogPtList[facilityID['facilityID']]['PatientLists']['date']) && notIncogPtList[facilityID['facilityID']]['PatientLists']['date'] === today) {
+              badgeCounter = notIncogPtList[facilityID['facilityID']]['PatientLists']['seenToday'].length - notIncogPtList[facilityID['facilityID']]['PatientLists']['certedToday'].length;
+            }
+          }
         }
-      }
+        badgeCounter += badgeCounterIncognito;
+        await chrome.action.setBadgeTextColor({...(badgeCounter === 0 ? {color: 'white'} : {color: 'red'})});
+        await chrome.action.setBadgeText({...(badgeCounter === 0 ? {text: ''} : {text: badgeCounter.toString()})});
+        break;
     }
-    badgeCounter += badgeCounterIncognito;
-    await chrome.action.setBadgeTextColor({...(badgeCounter === 0 ? {color: 'white'} : {color: 'red'})});
-    await chrome.action.setBadgeText({...(badgeCounter === 0 ? {text: ''} : {text: badgeCounter.toString()})});
+  }
+
+  async function checkHealth() {
+    Object.keys(lastHeartbeats).forEach(heartbeat => {
+      // check if any heartbeats more than 30 seconds old
+      healthStatus[heartbeat] = Date.now() - lastHeartbeats[heartbeat] <= 61000;
+    })
+    await chrome.storage.local.set({healthStatus: healthStatus});
+    if (Object.values(healthStatus).some(value => !value)) {
+      // if any healthStatus values are false set icond to red
+      await chrome.action.setIcon({path:'icons/icon32-red.png'});
+      return 'failed';
+    } else {
+      await chrome.action.setIcon({path:'icons/icon32.png'});
+      return 'success';
+    }
   }
 
   async function openWorkingPages() {
