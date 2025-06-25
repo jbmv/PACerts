@@ -44,7 +44,11 @@
         </div>
     </div>
 </div>
-<div id="extension-not-initialized" class="d-none container display-6 m-3 text-center"><div class="container"><b>MJ Not Found</b></div><div class="container small display-6"><small>Please refresh MJ pages or <a id="mj-login" href="#">login</a> to MJ</small></div></div>
+<div id="extension-not-initialized" class="d-none container display-6 m-3 text-center">
+    <div class="container"><b>MJ Not Found</b></div><div class="container small display-6">
+    <small>Please <a id="activate-link" href="#">activate</a> plugin or <a id="mj-login" href="#">login</a> to MJ</small>
+</div>
+</div>
 
 <div class="container-fluid">
 <table id="to-cert-table" class="table table-sm dataTable"></table>
@@ -57,7 +61,7 @@
         <div class="col-9 d-flex justify-content-end">
             <button id="reports-button" class="mx-2 btn btn-sm btn-outline-secondary d-none">Daily Report</button>
             <button id="options-button" class="mx-2 btn btn-sm btn-outline-secondary d-none">Options</button>
-            <div class="d-flex align-items-center flex-row-reverse ml-2 d-none">
+            <div class="d-flex align-items-center flex-row-reverse ml-2">
                 <div class="form-check form-switch">
                     <input class="form-check-input" type="checkbox" role="switch" id="auto-cert-switch">
                     <label class="form-check-label" for="auto-cert-switch">Auto Cert</label>

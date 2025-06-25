@@ -1,11 +1,27 @@
+const isIncognitoMode = chrome.extension.inIncognitoContext;
+const facilityIDKey = isIncognitoMode ? 'facilityID-incognito' : 'facilityID';
+const stateKey = isIncognitoMode ? 'state-incognito' : 'state';
+
 // default options before loading from storage
 let options = { 'autocert': false }
 let limitationsToIgnore = ['None','none','no'];
+
 // Await document load
 document.addEventListener('DOMContentLoaded', function () {
     // After page load
-    main();
+    chrome.runtime.onMessage.addListener(handleStateChange);
+    chrome.storage.local.get(stateKey).then(state => {
+        if (state['state'] !== 'await activation') {
+            main();
+        }
+    })
 });
+
+async function handleStateChange(message) {
+    if (message.messageFunction === 'activate') {
+        window.location.reload();
+    }
+}
 
 async function main() {
     if ((await chrome.storage.local.get('options')).hasOwnProperty('options')) {
@@ -45,6 +61,8 @@ async function main() {
             const stateIDBox = document.getElementById('rn_patientid');
             const lastNameBox = document.getElementById('rn_patient_lastname');
             const dobBox = document.getElementById('rn_patient_dob');
+            // reload page if these boxes aren't empty -- means we left the page in an invalid state
+            if (stateIDBox.value !== '' || lastNameBox.value !== '' || dobBox.value !== '') { window.location.reload(); }
             if (stateIDBox && lastNameBox && dobBox) {
                 // only run this code if we are on the cert page
                 sendResponse({'DOHSearchPatient': 'success'});
@@ -339,21 +357,17 @@ async function main() {
         try {
             chrome.runtime.sendMessage(message, function (response) {
                 if (chrome.runtime.lastError) {
-                    // reload page if can't send heartbeat
                     console.log(
                         'Error sending heartbeat from content script: ',
                         chrome.runtime.lastError.message,
                     );
-                    window.location.reload();
                 } else if (response) {
                     console.info('heartbeat heard: ', response);
                 }
             });
         }
         catch (e) {
-            // reload page if can't send heartbeat
             console.log('error sending heartbeat: ', e);
-            window.location.reload();
         }
     }
 }
