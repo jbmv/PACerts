@@ -308,7 +308,7 @@ document.addEventListener("DOMContentLoaded", function(e) {
                     })
                     // reload page if any local data changes occur
                     chrome.storage.local.onChanged.addListener((changes) => {
-                        if (changes[facilityID['facilityID']] || changes['options'] || changes['healthStatus'] || changes['stateKey']) {
+                        if (changes[facilityID[facilityIDKey]] || changes['options'] || changes['healthStatus'] || changes['stateKey']) {
                             window.location.reload();
                         }
                     });
