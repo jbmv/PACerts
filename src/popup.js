@@ -143,9 +143,9 @@ document.addEventListener("DOMContentLoaded", function(e) {
                             render: function (data, type, row) {
                                 if (row.hasOwnProperty('certData') && row.certData.date === today) {
                                     let text = '';
-                                    let limitationsToIgnore = ['None','none','no'];
-                                    if (!limitationsToIgnore.includes(row.certData.limitations.trim())) {text += `Limitations: ${row.certData.limitations}!   `;}
-                                    if (row.certData.firstVisit === true) {text += `First Visit!   `;}
+                                    let limitationsToIgnore = ['negative','none','no'];
+                                    if (!limitationsToIgnore.includes(row.certData.limitations.toLowerCase().trim())) {text += `<span class="text-danger"><strong>Limitations: ${row.certData.limitations} </strong></span>`;}
+                                    if (row.certData.firstVisit === true) {text += `<span class="text-danger"><strong>First Visit </strong></span>`;}
                                     text += `Indications: ${row.certData.indications.join(", ")}   `;
                                     return text;
                                 } else { return ''; }

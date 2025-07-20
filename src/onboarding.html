@@ -2,9 +2,78 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Title</title>
+    <title>PA Certs Onboarding</title>
+    <link href="bootstrap/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="bootstrap/dist/js/bootstrap.bundle.js"></script>
 </head>
 <body>
+<div class="col-lg-8 mx-auto p-4 py-md-5">
+    <header class="d-flex align-items-center pb-3 mb-5 border-bottom">
+            <span class="display-4">Welcome to the PACerts Tutorial</span>
+    </header>
+    <main>
+        <h2 class="text-body-emphasis">About This Extension</h2>
+        <p class="fs-5 col-md-8">
+            This extension is designed to help Pennsylvania pharmacists review and annotate patient certificates in the PA Medical Marijuana program.
+        </p>
+        <p class="fs-6">
+            As patients are checked into MJ, and their orders are started, they will appear in the patient list of the extension. The order must be started for the data to be sent to the extension.
+            <br>Every 30 seconds, the extension will automatically retrieve the patient DOB and State ID necessary to view their certificate.
+            <br>Once the patient data necessary for viewing the certificate, the status will change to "View Certificate".
+            <br>Clicking this will open the DOH page and summarize their certificate for review.
+            <br>Once your dispensary note is saved, the patient is automatically hidden from the list unless "Show Completed" is checked.
+        </p>
+        <hr class="col-3 col-md-2 mt-5">
+        <div class="row g-5">
+            <div class="col-md-6">
+                <h2 class="text-body-emphasis">Getting Started</h2>
+                <p>
+                    <img src="onboarding_images/popup-loaded.png" width="500" style="float:left">
+                    Most of the actions you will take with this extension happen from the popup window accessed by
+                    clicking on the extension icon.
+                    Pin the extension to the chrome extenion bar for easy access.
+                </p>
+                <p>
+                    In order to activate the extension, you must log in to MJ using the link from the extension popup
+                    window. This prevents other workers in your facility from accidentally activating the extension.
+                </p>
+            </div>
+        </div>
+            <hr class="col-3 col-md-2 mt-5">
+            <div class="row g-5">
+                <div class="col-md-6">
+                    <h2 class="text-body-emphasis">Usage Guide</h2>
+                    Header Section:
+                    <ul>
+                        <li>This section shows the Facility Name and the App Status.</li>
+                        <li>The status buttons for each page will turn green when the extension is receiving data from
+                            the respective pages.
+                        </li>
+                        <li>If the status button turns red, this indicates a loss of communication to the extension.
+                            Please re-open or re-load the respective page by clicking on the button.
+                        </li>
+                    </ul>
+                    Patient Section:
+                    <ul>
+                        <li>This section is auto-populated when a patient is checked into the store and their order is started.</li>
+                        <li>The patient cert notes are populated once the patient is looked up in the DOH portal</li>
+                        <ul>
+                            <li>"Limitation" -- the patient has a limitation set by the certifying physician</li>
+                            <li>"First Visit" -- this is the patient's first visit on their first certificate ever</li>
+                            <li>"Indications" -- lists the indications on the certificate</li>
+                        </ul>
+                        <li>The patient status reflects the next step to take to finish reviewing the certificate:</li>
+                        <ul>
+                            <li>"Search MJ" -- clicking this will lookup the patient data necessary to view the certificate</li>
+                            <li>"View Certificate" -- This will load the DOH page for this patient, summarize the certificate, and display that info above the DOH comment box</li>
+                            <li>"Already Certed Today" -- the patient has a pharmacist comment </li>
+                            <li>"Completed" -- The patient certificate has been reviewed. The patient is automatically hidden after review is complete. <br>Check the "Show Completed" chckbox to show these patients.</li>
+                        </ul>
+                    </ul>
+                </div>
+            </div>
+    </main>
+</div>
 
 </body>
 </html>

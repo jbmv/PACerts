@@ -7,6 +7,11 @@ let state = 'await activation';
 chrome.storage.local.set({[stateKey]: state});
 chrome.action.setIcon({path:'icons/icon32-red.png'});
 
+chrome.runtime.onInstalled.addListener(({ reason }) => {
+  if (reason === 'install') {
+    chrome.tabs.create({ url: 'onboarding.html' });
+  }
+});
 
 chrome.runtime.onMessage.addListener(async (message,sender,sendResponse) => {
   if (message.messageFunction === 'activate') {
