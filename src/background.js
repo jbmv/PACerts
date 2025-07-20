@@ -36,7 +36,7 @@ async function activate() {
     mjQueue: false
   };
 // default options before loading from storage
-  let options = { 'autoCert': false, 'openPages': false };
+  let options = { 'autoCert': false, 'openPages': false, 'sound': false };
 // set state in local storage and await initialization message from MJ to know which facility to load from local storage
   chrome.action.setIcon({path:'icons/icon32-red.png'});
   chrome.storage.local.set({healthStatus: healthStatus});
@@ -356,12 +356,14 @@ async function activate() {
         } else {
           patients[dohConsumerID]['certData'] = certData;
           patientLists['problems'].push(dohConsumerID);
-          await createOffscreenDocument();
-          await chrome.runtime.sendMessage({type: 'play-sound', sound: 'problemcert.mp3'}, response => {
-            if (chrome.runtime.lastError) {
-              console.log('error playing sound: ', chrome.runtime.lastError.message);
-            }
-          });
+          if (options.sound) {
+            await createOffscreenDocument();
+            await chrome.runtime.sendMessage({type: 'play-sound', sound: 'problemcert.mp3'}, response => {
+              if (chrome.runtime.lastError) {
+                console.log('error playing sound: ', chrome.runtime.lastError.message);
+              }
+            });
+          }
           writeFacilityKeyToStorageApi();
 
         }
@@ -374,12 +376,14 @@ async function activate() {
         console.log('queue alarm triggered', alarm);
         let healthCheck = await checkHealth();
         if (healthCheck === 'failed') {
-          await createOffscreenDocument();
-          await chrome.runtime.sendMessage({type: 'play-sound', sound: 'healthcheckfail.mp3'}, response => {
-            if (chrome.runtime.lastError) {
-              console.log('error playing sound: ', chrome.runtime.lastError.message);
-            }
-          });
+          if (options.sound) {
+            await createOffscreenDocument();
+            await chrome.runtime.sendMessage({type: 'play-sound', sound: 'healthcheckfail.mp3'}, response => {
+              if (chrome.runtime.lastError) {
+                console.log('error playing sound: ', chrome.runtime.lastError.message);
+              }
+            });
+          }
         }
         // process only 1 patient every trigger
         let patientsToProcess = patientLists.seenToday.filter(patient => !patientLists.certedToday.includes(patient));
@@ -531,12 +535,14 @@ async function activate() {
             await chrome.action.setBadgeTextColor({...(badgeCounter === 0 ? {color: 'white'} : {color: 'red'})});
             await chrome.action.setBadgeText({...(badgeCounter === 0 ? {text: ''} : {text: badgeCounter.toString()})});
             if (patientLists.problems.length > 0) {
-              await createOffscreenDocument();
-              await chrome.runtime.sendMessage({type: 'play-sound', sound: 'problemcert.mp3'}, response => {
-                if (chrome.runtime.lastError) {
-                  console.log('error playing sound: ', chrome.runtime.lastError.message);
-                }
-              });
+              if (options.sound) {
+                await createOffscreenDocument();
+                await chrome.runtime.sendMessage({type: 'play-sound', sound: 'problemcert.mp3'}, response => {
+                  if (chrome.runtime.lastError) {
+                    console.log('error playing sound: ', chrome.runtime.lastError.message);
+                  }
+                });
+              }
             }
             break;
           case false:
@@ -566,12 +572,14 @@ async function activate() {
             await chrome.action.setBadgeTextColor({...(badgeCounter === 0 ? {color: 'white'} : {color: 'red'})});
             await chrome.action.setBadgeText({...(badgeCounter === 0 ? {text: ''} : {text: badgeCounter.toString()})});
             if (badgeCounter > oldCount) {
-              await createOffscreenDocument();
-              await chrome.runtime.sendMessage({type: 'play-sound', sound: 'problemcert.mp3'}, response => {
-                if (chrome.runtime.lastError) {
-                  console.log('error playing sound: ', chrome.runtime.lastError.message);
-                }
-              });
+              if (options.sound) {
+                await createOffscreenDocument();
+                await chrome.runtime.sendMessage({type: 'play-sound', sound: 'problemcert.mp3'}, response => {
+                  if (chrome.runtime.lastError) {
+                    console.log('error playing sound: ', chrome.runtime.lastError.message);
+                  }
+                });
+              }
             }
             break;
         }

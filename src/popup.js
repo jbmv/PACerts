@@ -204,6 +204,8 @@ document.addEventListener("DOMContentLoaded", function(e) {
                 let showCompletedCheckbox = document.getElementById('showCompletedCheckbox');
                 let autoCertToggle = document.getElementById('auto-cert-switch');
                 autoCertToggle.checked = options.autoCert;
+                let soundToggle = document.getElementById('sound-switch');
+                soundToggle.checked = options.sound;
                 addListeners(table, markCompletedButton, showCompletedCheckbox);
                 //function definitions
                 function addListeners() {
@@ -270,6 +272,10 @@ document.addEventListener("DOMContentLoaded", function(e) {
                     })
                     autoCertToggle.addEventListener('change', async function () {
                         options.autoCert = this.checked;
+                        await chrome.storage.local.set({ 'options':options })
+                    })
+                    soundToggle.addEventListener('change', async function () {
+                        options.sound = this.checked;
                         await chrome.storage.local.set({ 'options':options })
                     })
                     document.getElementById('MJQ-status').addEventListener('click', async function () {
