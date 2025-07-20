@@ -273,6 +273,12 @@ document.addEventListener("DOMContentLoaded", function(e) {
                         }
                     })
                     autoCertToggle.addEventListener('change', async function () {
+                        if (this.checked) {
+                            if (!confirm("This will auto annotate certificates that have no limitations and are not first visits. " +
+                                "You MUST have prior approval from your organization to use this feature. " +
+                                "You MUST have prior approval from the PA DOH to use automated tools on the government database. " +
+                                "You agree that the author of this extension is not liable for your use of this feature.")) { this.checked = false; return; }
+                        }
                         options.autoCert = this.checked;
                         await chrome.storage.local.set({ 'options':options })
                     })
