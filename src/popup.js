@@ -96,9 +96,9 @@ document.addEventListener("DOMContentLoaded", function(e) {
             }
             async function drawBanner() {
                 let facilityDiv = document.getElementById('facility');
-                let facility = facilityID['facilityID']
+                let facility = facilityID[facilityIDKey]
                 if ((await chrome.storage.local.get('facilityIDToNameMap')).hasOwnProperty('facilityIDToNameMap')) {
-                    facility = (await chrome.storage.local.get('facilityIDToNameMap')).facilityIDToNameMap[facilityID['facilityID']] ?? facility;
+                    facility = (await chrome.storage.local.get('facilityIDToNameMap')).facilityIDToNameMap[facilityID[facilityIDKey]] ?? facility;
                 }
                 facilityDiv.innerHTML += " " + facility;
                 let healthStatus = await chrome.storage.local.get(['healthStatus']);
