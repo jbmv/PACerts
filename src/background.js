@@ -215,7 +215,7 @@ async function activate() {
         console.log(transactionReport);
         let missedPatients = [];
         Object.keys(transactionReport.transactions).forEach(key => {
-          if (!patientLists['seenToday'].includes(key)) {
+          if (transactionReport.transactions[key].orderDate === today && !patientLists['seenToday'].includes(key)) {
             missedPatients.push(key);
           }
         });
