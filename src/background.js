@@ -291,7 +291,7 @@ async function activate() {
         else if (message.url.indexOf('mjplatform.com/patients') !== -1) {
           lastHeartbeats.mjSearch = message.timeStamp;
         }
-        else if (message.url.indexOf('mjplatform.com/retail/sales-report/transactions*') !== -1) {
+        else if (message.url.indexOf('sales-report/transactions') !== -1) {
           lastHeartbeats.mjTransactions = message.timeStamp;
         }
         else if (message.url.indexOf('app/patient-certifications-med') !== -1) {
