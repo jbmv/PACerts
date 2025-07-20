@@ -33,7 +33,8 @@ async function activate() {
   let healthStatus = {
     doh: false,
     mjSearch: false,
-    mjQueue: false
+    mjQueue: false,
+    mjTransactions: false
   };
 // default options before loading from storage
   let options = { 'autoCert': false, 'openPages': false, 'sound': false };
@@ -92,7 +93,7 @@ async function activate() {
       console.log(`Extension running with incognito: ${isIncognitoMode}, and facilityID: ${facilityID}`);
       updateBadgeCounter();
       // give 3 min grace period to get all pages working
-      lastHeartbeats = { 'doh': Date.now() + 180000, 'mjQueue': Date.now() + 180000, 'mjSearch': Date.now() + 60000 };
+      lastHeartbeats = { 'doh': Date.now() + 180000, 'mjQueue': Date.now() + 180000, 'mjSearch': Date.now() + 60000, mjTransactions: Date.now() + 60000 };
       checkHealth();
       await chrome.storage.local.set({[stateKey]: state});
       await chrome.storage.local.set({[facilityIDKey]: facilityID});
@@ -289,6 +290,9 @@ async function activate() {
         }
         else if (message.url.indexOf('mjplatform.com/patients') !== -1) {
           lastHeartbeats.mjSearch = message.timeStamp;
+        }
+        else if (message.url.indexOf('mjplatform.com/retail/sales-report/transactions*') !== -1) {
+          lastHeartbeats.mjTransactions = message.timeStamp;
         }
         else if (message.url.indexOf('app/patient-certifications-med') !== -1) {
           lastHeartbeats.doh = message.timeStamp;

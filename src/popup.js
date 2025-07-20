@@ -105,9 +105,11 @@ document.addEventListener("DOMContentLoaded", function(e) {
                 let banner = document.getElementById('banner');
                 let mjp = document.getElementById('MJP-status');
                 let mjq = document.getElementById('MJQ-status');
+                let mjt = document.getElementById('MJT-status');
                 let doh = document.getElementById('DOH-status');
                 if (healthStatus['healthStatus'].mjSearch) { mjp.classList.remove('btn-danger'); mjp.classList.add('btn-success'); }
                 if (healthStatus['healthStatus'].mjQueue) { mjq.classList.remove('btn-danger'); mjq.classList.add('btn-success'); }
+                if (healthStatus['healthStatus'].mjTransactions) { mjt.classList.remove('btn-danger'); mjt.classList.add('btn-success'); }
                 if (healthStatus['healthStatus'].doh) { doh.classList.remove('btn-danger'); doh.classList.add('btn-success'); }
                 banner.classList.remove('d-none');
             }
@@ -293,6 +295,17 @@ document.addEventListener("DOMContentLoaded", function(e) {
                         let tabs = await chrome.tabs.query({url: '*://*.mjplatform.com/patients*'});
                         if (tabs.length === 0) {
                             await chrome.tabs.create({url: 'https://app.mjplatform.com/patients', active: true});
+                        } else {
+                            await chrome.tabs.update(tabs[0].id, {active: true});
+                            if (this.classList.contains('btn-danger')) {
+                                await chrome.tabs.sendMessage(tabs[0].id, {'messageFunction': 'activate'});
+                            }
+                        }
+                    })
+                    document.getElementById('MJT-status').addEventListener('click', async function () {
+                        let tabs = await chrome.tabs.query({url: '*://*.mjplatform.com/retail/sales-report/transactions*'});
+                        if (tabs.length === 0) {
+                            await chrome.tabs.create({url: 'https://app.mjplatform.com/retail/sales-report/transactions', active: true});
                         } else {
                             await chrome.tabs.update(tabs[0].id, {active: true});
                             if (this.classList.contains('btn-danger')) {
