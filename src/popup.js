@@ -160,7 +160,7 @@ document.addEventListener("DOMContentLoaded", function(e) {
                             render: function (data, type, row) {
                                 if (patientsSorted.certedToday.includes(row)) { return 'Completed' }
                                 if (row.hasOwnProperty('stateID')) {
-                                    return (row.hasOwnProperty('certData') && row.certData.disposition !== 'certed') ?  row.certData.disposition : 'View Certificate';
+                                    return (row.hasOwnProperty('certData') && row.certData.disposition !== 'certed') ? `<span class="text-danger"><strong>${row.certData.disposition}</strong></span>` : 'View Certificate';
                                 } else {
                                     return 'Search MJ'
                                 }
