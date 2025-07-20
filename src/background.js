@@ -37,7 +37,7 @@ async function activate() {
     mjTransactions: false
   };
 // default options before loading from storage
-  let options = { 'autoCert': false, 'openPages': false, 'sound': false };
+  let options = { 'autoCert': false, 'openPages': false, 'sound': true };
 // set state in local storage and await initialization message from MJ to know which facility to load from local storage
   chrome.action.setIcon({path:'icons/icon32-red.png'});
   chrome.storage.local.set({healthStatus: healthStatus});
