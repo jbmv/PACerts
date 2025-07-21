@@ -96,18 +96,20 @@ document.addEventListener("DOMContentLoaded", function(e) {
             }
             async function drawBanner() {
                 let facilityDiv = document.getElementById('facility');
-                let facility = facilityID['facilityID']
+                let facility = facilityID[facilityIDKey]
                 if ((await chrome.storage.local.get('facilityIDToNameMap')).hasOwnProperty('facilityIDToNameMap')) {
-                    facility = (await chrome.storage.local.get('facilityIDToNameMap')).facilityIDToNameMap[facilityID['facilityID']] ?? facility;
+                    facility = (await chrome.storage.local.get('facilityIDToNameMap')).facilityIDToNameMap[facilityID[facilityIDKey]] ?? facility;
                 }
                 facilityDiv.innerHTML += " " + facility;
                 let healthStatus = await chrome.storage.local.get(['healthStatus']);
                 let banner = document.getElementById('banner');
                 let mjp = document.getElementById('MJP-status');
                 let mjq = document.getElementById('MJQ-status');
+                let mjt = document.getElementById('MJT-status');
                 let doh = document.getElementById('DOH-status');
                 if (healthStatus['healthStatus'].mjSearch) { mjp.classList.remove('btn-danger'); mjp.classList.add('btn-success'); }
                 if (healthStatus['healthStatus'].mjQueue) { mjq.classList.remove('btn-danger'); mjq.classList.add('btn-success'); }
+                if (healthStatus['healthStatus'].mjTransactions) { mjt.classList.remove('btn-danger'); mjt.classList.add('btn-success'); }
                 if (healthStatus['healthStatus'].doh) { doh.classList.remove('btn-danger'); doh.classList.add('btn-success'); }
                 banner.classList.remove('d-none');
             }
@@ -143,9 +145,9 @@ document.addEventListener("DOMContentLoaded", function(e) {
                             render: function (data, type, row) {
                                 if (row.hasOwnProperty('certData') && row.certData.date === today) {
                                     let text = '';
-                                    let limitationsToIgnore = ['None','none','no'];
-                                    if (!limitationsToIgnore.includes(row.certData.limitations.trim())) {text += `Limitations: ${row.certData.limitations}!   `;}
-                                    if (row.certData.firstVisit === true) {text += `First Visit!   `;}
+                                    let limitationsToIgnore = ['negative','none','no'];
+                                    if (!limitationsToIgnore.includes(row.certData.limitations.toLowerCase().trim())) {text += `<span class="text-danger"><strong>Limitations: ${row.certData.limitations} </strong></span>`;}
+                                    if (row.certData.firstVisit === true) {text += `<span class="text-danger"><strong>First Visit </strong></span>`;}
                                     text += `Indications: ${row.certData.indications.join(", ")}   `;
                                     return text;
                                 } else { return ''; }
@@ -158,7 +160,7 @@ document.addEventListener("DOMContentLoaded", function(e) {
                             render: function (data, type, row) {
                                 if (patientsSorted.certedToday.includes(row)) { return 'Completed' }
                                 if (row.hasOwnProperty('stateID')) {
-                                    return (row.hasOwnProperty('certData') && row.certData.disposition !== 'certed') ?  row.certData.disposition : 'View Certificate';
+                                    return (row.hasOwnProperty('certData') && row.certData.disposition !== 'certed') ? `<span class="text-danger"><strong>${row.certData.disposition}</strong></span>` : 'View Certificate';
                                 } else {
                                     return 'Search MJ'
                                 }
@@ -204,6 +206,8 @@ document.addEventListener("DOMContentLoaded", function(e) {
                 let showCompletedCheckbox = document.getElementById('showCompletedCheckbox');
                 let autoCertToggle = document.getElementById('auto-cert-switch');
                 autoCertToggle.checked = options.autoCert;
+                let soundToggle = document.getElementById('sound-switch');
+                soundToggle.checked = options.sound;
                 addListeners(table, markCompletedButton, showCompletedCheckbox);
                 //function definitions
                 function addListeners() {
@@ -269,7 +273,17 @@ document.addEventListener("DOMContentLoaded", function(e) {
                         }
                     })
                     autoCertToggle.addEventListener('change', async function () {
+                        if (this.checked) {
+                            if (!confirm("This will auto annotate certificates that have no limitations and are not first visits. " +
+                                "You MUST have prior approval from your organization to use this feature. " +
+                                "You MUST have prior approval from the PA DOH to use automated tools on the government database. " +
+                                "You agree that the author of this extension is not liable for your use of this feature.")) { this.checked = false; return; }
+                        }
                         options.autoCert = this.checked;
+                        await chrome.storage.local.set({ 'options':options })
+                    })
+                    soundToggle.addEventListener('change', async function () {
+                        options.sound = this.checked;
                         await chrome.storage.local.set({ 'options':options })
                     })
                     document.getElementById('MJQ-status').addEventListener('click', async function () {
@@ -294,6 +308,17 @@ document.addEventListener("DOMContentLoaded", function(e) {
                             }
                         }
                     })
+                    document.getElementById('MJT-status').addEventListener('click', async function () {
+                        let tabs = await chrome.tabs.query({url: '*://*.mjplatform.com/retail/sales-report/transactions*'});
+                        if (tabs.length === 0) {
+                            await chrome.tabs.create({url: 'https://app.mjplatform.com/retail/sales-report/transactions', active: true});
+                        } else {
+                            await chrome.tabs.update(tabs[0].id, {active: true});
+                            if (this.classList.contains('btn-danger')) {
+                                await chrome.tabs.sendMessage(tabs[0].id, {'messageFunction': 'activate'});
+                            }
+                        }
+                    })
                     document.getElementById('DOH-status').addEventListener('click', async function () {
                         let tabs = await chrome.tabs.query({url: '*://*.padohmmp.custhelp.com/app/patient-certifications-med*'});
                         if (tabs.length === 0) {
@@ -308,7 +333,7 @@ document.addEventListener("DOMContentLoaded", function(e) {
                     })
                     // reload page if any local data changes occur
                     chrome.storage.local.onChanged.addListener((changes) => {
-                        if (changes[facilityID['facilityID']] || changes['options'] || changes['healthStatus'] || changes['stateKey']) {
+                        if (changes[facilityID[facilityIDKey]] || changes['options'] || changes['healthStatus'] || changes['stateKey']) {
                             window.location.reload();
                         }
                     });

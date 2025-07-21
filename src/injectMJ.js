@@ -125,6 +125,7 @@ const extensionID = "pknjbljkccmnjiibcmjiefofiaopbcnl";
                     if (transaction.consumer_id && transaction.consumer_name && transaction.order_date) {
                         transactions[transaction.consumer_id.toString()] = {
                             'compoundName': transaction.consumer_name,
+                            'orderDate': transaction.order_date.substring(0, 10),
                             'orderTimeStamp': new Date(transaction.order_date).getTime()
                         }
                     }
