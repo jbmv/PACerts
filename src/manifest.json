@@ -27,6 +27,7 @@
   },
   "host_permissions": [ "https://*.mjplatform.com/*", "https://*.padohmmp.custhelp.com/*" ],
   "incognito": "split",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvZIrBfjPRytQ35j0C9O1nqMKbwhzqiH76sdDaKYUIMZzh6XjxSOnfrDbUhJePc+wtH/gHLX+SO6gwW+dEnLNFHOr2pUClIAB0qqXLZ95WvdKgV8NirPsPKUO6vX7WxzsnSo7NNdzJkFGBHV6qKKRpw6ShNeTIRcTr/J23KfeWNfGcQrImWhxNxxFSWdS+DAYvHzFXCxB12A82HrT8TLxqxW1eVlU+fgCBeZdMqK1JycVOno/mTep3xDKfVVGeVLYuQED90scL8uotXOcLGxL4UBHvj8g/SyYdjxRhY/JSuRosBPNDTMihcWTnoQlnaDXeu/uwa664VG28vCrX4BYTQIDAQAB",
   "manifest_version": 3,
   "name": "PACerts",
   "options_page": "options.html",
