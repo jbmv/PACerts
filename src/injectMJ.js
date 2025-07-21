@@ -5,7 +5,7 @@
 //     let message = {'facilityID': facilityID, 'facilityName': facilityName}
 //     console.log(message);
 // })
-const extensionID = "pknjbljkccmnjiibcmjiefofiaopbcnl";
+const extensionID = "kpcedepijhpepjapebgcpkkpkklkejkp";
 (function(xhr) {
     var XHR = XMLHttpRequest.prototype;
     var open = XHR.open;
