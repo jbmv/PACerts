@@ -5,7 +5,6 @@ const facilityIDKey = isIncognitoMode ? 'facilityID-incognito' : 'facilityID';
 const stateKey = isIncognitoMode ? 'state-incognito' : 'state';
 let state = 'await activation';
 chrome.storage.local.set({[stateKey]: state});
-chrome.action.setIcon({path:'icons/icon32-red.png'});
 
 chrome.runtime.onInstalled.addListener(({ reason }) => {
   if (reason === 'install') {
@@ -600,7 +599,7 @@ async function activate() {
         await chrome.action.setIcon({path:'icons/icon32-red.png'});
         return 'failed';
       } else {
-        await chrome.action.setIcon({path:'icons/icon32.png'});
+        await chrome.action.setIcon({path:'icons/icon32-green.png'});
         return 'success';
       }
     }
