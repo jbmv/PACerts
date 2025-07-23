@@ -33,11 +33,8 @@
   "options_page": "options.html",
   "permissions": [
     "alarms",
-    "activeTab",
     "storage",
     "unlimitedStorage",
-    "tabs",
-    "webRequest",
     "offscreen"
   ],
   "update_url": "https://clients2.google.com/service/update2/crx",
