@@ -2,15 +2,19 @@ const isIncognitoMode = chrome.extension.inIncognitoContext;
 const facilityIDKey = isIncognitoMode ? 'facilityID-incognito' : 'facilityID';
 const stateKey = isIncognitoMode ? 'state-incognito' : 'state';
 let currentUrl = window.location.href;
-// Inject script into MJ page to extend xhttp requests so we can grab response data for processing
-if (currentUrl.indexOf('mjplatform.com') !== -1) {
-    var s = document.createElement('script');
-    s.src = chrome.runtime.getURL('injectMJ.js');
-    s.onload = function () {
-        this.remove();
-    };
-    (document.head || document.documentElement).appendChild(s);
-}
+chrome.storage.local.get(stateKey).then(state => {
+    if (state['state'] !== 'await activation') {
+        // Inject script into MJ page to extend xhttp requests so we can grab response data for processing
+        if (currentUrl.indexOf('mjplatform.com') !== -1) {
+            var s = document.createElement('script');
+            s.src = chrome.runtime.getURL('injectMJ.js');
+            s.onload = function () {
+                this.remove();
+            };
+            (document.head || document.documentElement).appendChild(s);
+        }
+    }
+})
 
 // default options before loading from storage
 let options = { 'autocert': false }
