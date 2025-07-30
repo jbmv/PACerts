@@ -136,7 +136,8 @@ document.addEventListener("DOMContentLoaded", function(e) {
                         {
                             width: 150,
                             data: 'compoundName',
-                            title: 'Name'
+                            title: 'Name',
+                            defaultContent: ''
                         },
                         {
                             data: 'certData',
@@ -180,6 +181,7 @@ document.addEventListener("DOMContentLoaded", function(e) {
                             data: 'orderTimeStamp',
                             title: 'Time Stamp',
                             visible: false,
+                            defaultContent: ''
                         }
                     ],
                     data: patientsSorted.seenToday
