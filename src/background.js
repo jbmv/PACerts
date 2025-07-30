@@ -518,21 +518,25 @@ async function activate() {
               // set badgeCounter from value in memory and load incognito data to set badgeCounterIncognito
               badgeCounter = patientLists['problems'].length;
               let incognitoFacilityID = await chrome.storage.local.get('facilityID-incognito');
-              if (incognitoFacilityID['facilityID-incognito']) {
+              if (incognitoFacilityID['facilityID-incognito'] && facilityID !== incognitoFacilityID['facilityID-incognito']) {
                 let incognitoPatientLists = await chrome.storage.local.get(incognitoFacilityID['facilityID-incognito']);
                 if ((incognitoPatientLists[incognitoFacilityID['facilityID-incognito']]['PatientLists'] && incognitoPatientLists[incognitoFacilityID['facilityID-incognito']]['PatientLists']['date']) && incognitoPatientLists[incognitoFacilityID['facilityID-incognito']]['PatientLists']['date'] === today) {
                   badgeCounterIncognito = incognitoPatientLists[incognitoFacilityID['facilityID-incognito']]['PatientLists']['problems'].length;
                 }
+              } else {
+                badgeCounterIncognito = 0;
               }
             } else {
               // set badgeCounterIncognito from value in memory and load non-incognito data to set badgeCounter
               badgeCounterIncognito = patientLists['problems'].length;
               let facilityID = await chrome.storage.local.get('facilityID');
-              if (facilityID['facilityID']) {
+              if (facilityID['facilityID'] && facilityID['facilityID'] !== facilityID) {
                 let notIncogPtList = await chrome.storage.local.get(facilityID['facilityID']);
                 if ((notIncogPtList[facilityID['facilityID']]['PatientLists'] && notIncogPtList[facilityID['facilityID']]['PatientLists']['date']) && notIncogPtList[facilityID['facilityID']]['PatientLists']['date'] === today) {
                   badgeCounter = notIncogPtList[facilityID['facilityID']]['PatientLists']['problems'].length;
                 }
+              } else {
+                badgeCounter = 0;
               }
             }
             badgeCounter += badgeCounterIncognito;
@@ -555,21 +559,25 @@ async function activate() {
               // set badgeCounter from value in memory and load incognito data to set badgeCounterIncognito
               badgeCounter = patientLists['seenToday'].length - patientLists['certedToday'].length;
               let incognitoFacilityID = await chrome.storage.local.get('facilityID-incognito');
-              if (incognitoFacilityID['facilityID-incognito']) {
+              if (incognitoFacilityID['facilityID-incognito'] && facilityID !== incognitoFacilityID['facilityID-incognito']) {
                 let incognitoPatientLists = await chrome.storage.local.get(incognitoFacilityID['facilityID-incognito']);
                 if ((incognitoPatientLists[incognitoFacilityID['facilityID-incognito']]['PatientLists'] && incognitoPatientLists[incognitoFacilityID['facilityID-incognito']]['PatientLists']['date']) && incognitoPatientLists[incognitoFacilityID['facilityID-incognito']]['PatientLists']['date'] === today) {
                   badgeCounterIncognito = incognitoPatientLists[incognitoFacilityID['facilityID-incognito']]['PatientLists']['seenToday'].length - incognitoPatientLists[incognitoFacilityID['facilityID-incognito']]['PatientLists']['certedToday'].length;
                 }
+              } else {
+                badgeCounterIncognito = 0;
               }
             } else {
               // set badgeCounterIncognito from value in memory and load non-incognito data to set badgeCounter
               badgeCounterIncognito = patientLists['seenToday'].length - patientLists['certedToday'].length;
               let facilityID = await chrome.storage.local.get('facilityID');
-              if (facilityID['facilityID']) {
+              if (facilityID['facilityID'] && facilityID !== facilityID['facilityID']) {
                 let notIncogPtList = await chrome.storage.local.get(facilityID['facilityID']);
                 if ((notIncogPtList[facilityID['facilityID']]['PatientLists'] && notIncogPtList[facilityID['facilityID']]['PatientLists']['date']) && notIncogPtList[facilityID['facilityID']]['PatientLists']['date'] === today) {
                   badgeCounter = notIncogPtList[facilityID['facilityID']]['PatientLists']['seenToday'].length - notIncogPtList[facilityID['facilityID']]['PatientLists']['certedToday'].length;
                 }
+              } else {
+                badgeCounter = 0;
               }
             }
             badgeCounter += badgeCounterIncognito;
