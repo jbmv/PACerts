@@ -9,15 +9,22 @@ chrome.action.setIcon({path:'icons/icon32.png'});
 
 chrome.runtime.onInstalled.addListener(({ reason }) => {
   if (reason === 'install') {
+    // open about page on install
     chrome.tabs.create({ url: 'onboarding.html' });
   }
+});
+
+chrome.runtime.onSuspend.addListener(function() {
+  // on suspension, change icon to orange
+  console.log("Extension is suspending. Performing cleanup...");
+  cleanUpSuspend();
 });
 
 chrome.runtime.onMessage.addListener(async (message,sender,sendResponse) => {
   if (message.messageFunction === 'activate') {
     await activate();
   } else if (message.messageFunction === 'deactivate') {
-
+    // not implemented yet
   }
 })
 
@@ -632,4 +639,16 @@ async function activate() {
     }
 
   }
+}
+
+async function cleanUpSuspend() {
+  if (options.sound) {
+    await createOffscreenDocument();
+    await chrome.runtime.sendMessage({type: 'play-sound', sound: 'healthcheckfail.mp3'}, response => {
+      if (chrome.runtime.lastError) {
+        console.log('error playing sound: ', chrome.runtime.lastError.message);
+      }
+    });
+  }
+  await chrome.action.setIcon({path:'icons/icon32.png'});
 }

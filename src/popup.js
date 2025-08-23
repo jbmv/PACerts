@@ -121,7 +121,7 @@ document.addEventListener("DOMContentLoaded", function(e) {
                     pageLength: 10,
                     select: {
                         style: 'multi',
-                        headerCheckbox: 'select-page',
+                        headerCheckbox: 'select-all',
                         selector: 'td:first-child',
                         // headerCheckbox: false
                     },

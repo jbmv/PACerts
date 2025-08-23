@@ -106,7 +106,7 @@ async function main() {
                                         && limitationsToIgnore.includes(certData.limitations.trim().toLowerCase())
                                         && certData.firstVisit === false
                                         && certData.indications.length > 0) {
-                                        noteTextArea.value = "reviewed"; //TODO: replace this hard-coded 'reviewed' with signoff from options
+                                        noteTextArea.value = "   "; //TODO: replace this hard-coded 'reviewed' with signoff from options
                                         console.log('padoh: auto-certing: ', consumerID);
                                         const save = document.getElementsByClassName('medicalProfSave')[0];
                                         save.click();
