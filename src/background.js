@@ -106,7 +106,7 @@ async function activate() {
       await chrome.storage.local.set({[facilityIDKey]: facilityID});
       chrome.runtime.onMessageExternal.addListener(handleExternalMessage);
       chrome.runtime.onMessage.addListener(handleInternalMessage);
-      await chrome.alarms.create('queue-alarm', {periodInMinutes: 0.5});
+      await chrome.alarms.create('queue-alarm', {periodInMinutes: 0.25});
       chrome.alarms.onAlarm.addListener(handlePeriodicAlarm);
       chrome.storage.local.onChanged.addListener(async (changes) => {
         if (changes['options']) {
