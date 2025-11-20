@@ -61,7 +61,7 @@ const extensionID = "kpcedepijhpepjapebgcpkkpkklkejkp";
                                         ...(order.hasOwnProperty('consumer_name') && { compoundName: order.consumer_name }),
                                         // created_at property in MJ is in GMT even though it's not labeled as such
                                         ...(order.hasOwnProperty('created_at') && { orderTimeStamp: new Date(order.created_at).getTime() }),
-                                        ...(order.hasOwnProperty('created_at') && { orderDate: order.created_at.substring(0, 10) })
+                                        ...(order.hasOwnProperty('created_at') && { orderDate: getOrderDate(order.created_at) })
                                     }, function(response)  {
                                         if (chrome.runtime.lastError) {
                                             console.log("InjectMJ: processOpenOrdersResponse - no response from background :", chrome.runtime.lastError.message);
@@ -113,6 +113,13 @@ const extensionID = "kpcedepijhpepjapebgcpkkpkklkejkp";
             } catch (e) {
                 console.log("error sending request:", e);
             }
+        }
+        function getOrderDate(isoDate) {
+            const date = new Date(isoDate);
+            const year = date.toLocaleString('default', { year: 'numeric' });
+            const month = date.toLocaleString('default', { month: '2-digit' });
+            const day = date.toLocaleString('default', { day: '2-digit' });
+            return `${year}-${month}-${day}`;
         }
         function processMJDailyTransactionsResponse(responseData) {
             // MJ sends a list of transactions completed so far today, send patient data of each transaction to backround service worker
