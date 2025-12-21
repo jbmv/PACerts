@@ -361,6 +361,14 @@ async function activate() {
             console.log('pateint marked as certed:', dohConsumerID);
             writeFacilityKeyToStorageApi();
             console.log('pateint marked as certed:', patients[dohConsumerID]);
+            if (options.sound) {
+              await createOffscreenDocument();
+              await chrome.runtime.sendMessage({type: 'play-sound', sound: 'checkin.mp3'}, response => {
+                if (chrome.runtime.lastError) {
+                  console.log('error playing sound: ', chrome.runtime.lastError.message);
+                }
+              });
+            }
           } else {
             console.error('processPatientCerted: no match on patient with doh sent:', dohConsumerID, dohStateID);
           }
@@ -369,7 +377,7 @@ async function activate() {
           patientLists['problems'].push(dohConsumerID);
           if (options.sound) {
             await createOffscreenDocument();
-            await chrome.runtime.sendMessage({type: 'play-sound', sound: 'problemcert.mp3'}, response => {
+            await chrome.runtime.sendMessage({type: 'play-sound', sound: 'problemcert.wav'}, response => {
               if (chrome.runtime.lastError) {
                 console.log('error playing sound: ', chrome.runtime.lastError.message);
               }
@@ -539,14 +547,6 @@ async function activate() {
             badgeCounter += badgeCounterIncognito;
             await chrome.action.setBadgeTextColor({...(badgeCounter === 0 ? {color: 'white'} : {color: 'red'})});
             await chrome.action.setBadgeText({...(badgeCounter === 0 ? {text: ''} : {text: badgeCounter.toString()})});
-            if (options.sound) {
-              await createOffscreenDocument();
-              await chrome.runtime.sendMessage({type: 'play-sound', sound: 'checkin.mp3'}, response => {
-                if (chrome.runtime.lastError) {
-                  console.log('error playing sound: ', chrome.runtime.lastError.message);
-                }
-              });
-            }
             break;
           case false:
             // start with counter = 0 for both
