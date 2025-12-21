@@ -187,7 +187,7 @@ document.addEventListener("DOMContentLoaded", function(e) {
                     data: patientsSorted.seenToday
                 });
                 // initially show only patients that haven't been certed today
-                table.column(4).search('false').draw();
+                // table.column(4).search('false').draw();
                 // fix for the select all box is in the wrong spot!
                 let selectAll = document.getElementsByClassName('dt-column-header')[0];
                 selectAll.style.setProperty('justify-content', 'center');
@@ -210,6 +210,7 @@ document.addEventListener("DOMContentLoaded", function(e) {
                 autoCertToggle.checked = options.autoCert;
                 let soundToggle = document.getElementById('sound-switch');
                 soundToggle.checked = options.sound;
+                showCompletedCheckbox.checked = true;
                 addListeners(table, markCompletedButton, showCompletedCheckbox);
                 //function definitions
                 function addListeners() {

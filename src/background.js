@@ -193,6 +193,14 @@ async function activate() {
             await storePatientObject(patientObject);
             // track any automatically processed patients by adding them to patientLists.seenToday
             patientLists['seenToday'].push(patientObject.consumerID);
+            if (options.sound && !options.autoCert) {
+              await createOffscreenDocument();
+              await chrome.runtime.sendMessage({type: 'play-sound', sound: 'checkin.mp3'}, response => {
+                if (chrome.runtime.lastError) {
+                  console.log('error playing sound: ', chrome.runtime.lastError.message);
+                }
+              });
+            }
             // check if this patient as been seen before -- if not, retrieve the stateID automatically and store it for use on DOH page and to avoid future lookups
             if (!patients[patientObject.stateID]) {
               // we can search MJ by consumerLicense or by compoundName
@@ -361,7 +369,7 @@ async function activate() {
             console.log('pateint marked as certed:', dohConsumerID);
             writeFacilityKeyToStorageApi();
             console.log('pateint marked as certed:', patients[dohConsumerID]);
-            if (options.sound && options.autoCert) {
+            if (options.autoCert) {
               await createOffscreenDocument();
               await chrome.runtime.sendMessage({type: 'play-sound', sound: 'checkin.mp3'}, response => {
                 if (chrome.runtime.lastError) {
@@ -578,16 +586,6 @@ async function activate() {
             badgeCounter += badgeCounterIncognito;
             await chrome.action.setBadgeTextColor({...(badgeCounter === 0 ? {color: 'white'} : {color: 'red'})});
             await chrome.action.setBadgeText({...(badgeCounter === 0 ? {text: ''} : {text: badgeCounter.toString()})});
-            if (badgeCounter > oldCount) {
-              if (options.sound) {
-                await createOffscreenDocument();
-                await chrome.runtime.sendMessage({type: 'play-sound', sound: 'checkin.mp3'}, response => {
-                  if (chrome.runtime.lastError) {
-                    console.log('error playing sound: ', chrome.runtime.lastError.message);
-                  }
-                });
-              }
-            }
             break;
         }
     }
