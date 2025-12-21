@@ -361,7 +361,7 @@ async function activate() {
             console.log('pateint marked as certed:', dohConsumerID);
             writeFacilityKeyToStorageApi();
             console.log('pateint marked as certed:', patients[dohConsumerID]);
-            if (options.sound) {
+            if (options.sound && options.autoCert) {
               await createOffscreenDocument();
               await chrome.runtime.sendMessage({type: 'play-sound', sound: 'checkin.mp3'}, response => {
                 if (chrome.runtime.lastError) {
