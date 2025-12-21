@@ -419,16 +419,6 @@ async function activate() {
       }
     }
 
-    async function createOffscreenDocument() {
-      const offscreenDocument = {
-        url: 'offscreen.html',
-        reasons: ['AUDIO_PLAYBACK'],
-        justification: 'Playing notification sounds',
-      };
-      if (await chrome.offscreen.hasDocument()) { return; }
-      await chrome.offscreen.createDocument(offscreenDocument);
-    }
-
     //function definitions -- these need to be accessible for both internal and external message handling
     function writeFacilityKeyToStorageApi() {
       // don't write key if not exists
@@ -549,15 +539,13 @@ async function activate() {
             badgeCounter += badgeCounterIncognito;
             await chrome.action.setBadgeTextColor({...(badgeCounter === 0 ? {color: 'white'} : {color: 'red'})});
             await chrome.action.setBadgeText({...(badgeCounter === 0 ? {text: ''} : {text: badgeCounter.toString()})});
-            if (patientLists.problems.length > 0) {
-              if (options.sound) {
-                await createOffscreenDocument();
-                await chrome.runtime.sendMessage({type: 'play-sound', sound: 'problemcert.mp3'}, response => {
-                  if (chrome.runtime.lastError) {
-                    console.log('error playing sound: ', chrome.runtime.lastError.message);
-                  }
-                });
-              }
+            if (options.sound) {
+              await createOffscreenDocument();
+              await chrome.runtime.sendMessage({type: 'play-sound', sound: 'checkin.mp3'}, response => {
+                if (chrome.runtime.lastError) {
+                  console.log('error playing sound: ', chrome.runtime.lastError.message);
+                }
+              });
             }
             break;
           case false:
@@ -593,7 +581,7 @@ async function activate() {
             if (badgeCounter > oldCount) {
               if (options.sound) {
                 await createOffscreenDocument();
-                await chrome.runtime.sendMessage({type: 'play-sound', sound: 'problemcert.mp3'}, response => {
+                await chrome.runtime.sendMessage({type: 'play-sound', sound: 'checkin.mp3'}, response => {
                   if (chrome.runtime.lastError) {
                     console.log('error playing sound: ', chrome.runtime.lastError.message);
                   }
@@ -639,6 +627,16 @@ async function activate() {
     }
 
   }
+}
+
+async function createOffscreenDocument() {
+  const offscreenDocument = {
+    url: 'offscreen.html',
+    reasons: ['AUDIO_PLAYBACK'],
+    justification: 'Playing notification sounds',
+  };
+  if (await chrome.offscreen.hasDocument()) { return; }
+  await chrome.offscreen.createDocument(offscreenDocument);
 }
 
 async function cleanUpSuspend() {
