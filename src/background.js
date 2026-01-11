@@ -593,7 +593,7 @@ async function activate() {
     async function checkHealth() {
       Object.keys(lastHeartbeats).forEach(heartbeat => {
         // check if any heartbeats more than 30 seconds old
-        healthStatus[heartbeat] = Date.now() - lastHeartbeats[heartbeat] <= 61000;
+        healthStatus[heartbeat] = Date.now() - lastHeartbeats[heartbeat] <= 122000;
       })
       await chrome.storage.local.set({healthStatus: healthStatus});
       if (Object.values(healthStatus).some(value => !value)) {
