@@ -51,6 +51,9 @@ async function main() {
             case 'MJGetStateID':
                 getStateID(message);
                 break;
+            case 'MJGetTransactions':
+                getMJTransactions();
+                break;
             default:
                 sendResponse(sendResponse({ success: false }));
         }
@@ -68,6 +71,19 @@ async function main() {
                 sendResponse({'Content Script getStateID':'success'});
             } else {
                 sendResponse({ 'MJGetStateID': 'failed: not on correct page' });
+            }
+        }
+        function getMJTransactions() {
+            if (currentUrl.indexOf('app.mjplatform.com/retail/sales-report/transactions') !== -1) {
+                let searchBoxClass = document.getElementsByClassName('submit-button');
+                let searchBox = searchBoxClass[0];
+                if (searchBoxClass && searchBox) {
+                    // only run if on correct page and elements exit
+                    searchBox.click();
+                }
+                sendResponse({'Content Script getMJTransactions':'success'});
+            } else {
+                sendResponse({ 'getMJTransactions': 'failed: not on correct page' });
             }
         }
     }

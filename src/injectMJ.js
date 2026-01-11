@@ -129,11 +129,12 @@ const extensionID = "kpcedepijhpepjapebgcpkkpkklkejkp";
                 myObj.forEach((transaction) => {
                     // iterate through all transactions and send the data to background service worker
                     // sends { consumerID: compoundName }
-                    if (transaction.consumer_id && transaction.consumer_name && transaction.order_date) {
+                    if (transaction.consumer_id && transaction.consumer_name && transaction.order_date && transaction.total_amount) {
                         transactions[transaction.consumer_id.toString()] = {
                             'compoundName': transaction.consumer_name,
                             'orderDate': transaction.order_date.substring(0, 10),
-                            'orderTimeStamp': new Date(transaction.order_date).getTime()
+                            'orderTimeStamp': new Date(transaction.order_date).getTime(),
+                            'orderTotal': transaction.total_amount
                         }
                     }
                 })

@@ -36,6 +36,7 @@ async function activate() {
   let today = date.getFullYear() + '-' + String((date.getMonth() + 1)).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
   let patients = {};
   let patientLists = {};
+  let totalSales = 0.0;
   let lastHeartbeats = {};
   let healthStatus = {
     doh: false,
@@ -107,6 +108,7 @@ async function activate() {
       chrome.runtime.onMessageExternal.addListener(handleExternalMessage);
       chrome.runtime.onMessage.addListener(handleInternalMessage);
       await chrome.alarms.create('queue-alarm', {periodInMinutes: 0.25});
+      await chrome.alarms.create('transaction-fetch-alarm', {periodInMinutes: 5});
       chrome.alarms.onAlarm.addListener(handlePeriodicAlarm);
       chrome.storage.local.onChanged.addListener(async (changes) => {
         if (changes['options']) {
@@ -231,8 +233,11 @@ async function activate() {
         console.log(transactionReport);
         let missedPatients = [];
         Object.keys(transactionReport.transactions).forEach(key => {
-          if (transactionReport.transactions[key].orderDate === today && !patientLists['seenToday'].includes(key)) {
-            missedPatients.push(key);
+          if (transactionReport.transactions[key].orderDate === today) {
+            totalSales += parseFloat(transactionReport.transactions[key].orderTotal, 10);
+            if (!patientLists['seenToday'].includes(key)) {
+              missedPatients.push(key);
+            }
           }
         });
         missedPatients.forEach(conID => {
@@ -433,6 +438,11 @@ async function activate() {
           }
         }
       }
+      if (alarm.name === 'transaction-fetch-alarm') {
+        console.log('transaction fetch triggered', alarm);
+        await fetchMJTransactions();
+        console.log('Refreshing MJ Transactions');
+      }
     }
 
     //function definitions -- these need to be accessible for both internal and external message handling
@@ -441,7 +451,7 @@ async function activate() {
       if (!facilityID || facilityID === '') {
         return;
       }
-      chrome.storage.local.set({[facilityID]: {'Patients': patients, 'PatientLists': patientLists}});
+      chrome.storage.local.set({[facilityID]: {'Patients': patients, 'PatientLists': patientLists, 'TotalSales': totalSales}});
       //update badge counter any time chrome.storage.local changes
       updateBadgeCounter();
 
@@ -462,6 +472,24 @@ async function activate() {
         await chrome.tabs.sendMessage(tabs[0].id, message, response => {
           if (chrome.runtime.lastError) {
             console.warn('openMJPatientPage: error sending message, receiver doesnt exist ', chrome.runtime.lastError);
+          }
+        });
+      }
+    }
+
+    async function fetchMJTransactions() {
+      let message = {
+        'messageFor': 'contentScript.js',
+        'messageFunction': 'MJGetTransactions'
+      };
+      let tabs = await chrome.tabs.query({url: 'https://*.mjplatform.com/*transactions*'});
+      if (tabs.length === 0) {
+        lastHeartbeats.mjTransactions = 1;
+        await checkHealth();
+      } else {
+        await chrome.tabs.sendMessage(tabs[0].id, message, response => {
+          if (chrome.runtime.lastError) {
+            console.warn('openMJTransactionPage: error sending message, receiver doesnt exist ', chrome.runtime.lastError);
           }
         });
       }

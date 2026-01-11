@@ -65,9 +65,10 @@ document.addEventListener("DOMContentLoaded", function(e) {
             const facilityID = await chrome.storage.local.get([facilityIDKey]);
             // Load data from local storage
             let data = await chrome.storage.local.get(facilityID[facilityIDKey]);
+            let totalSales = data[facilityID[facilityIDKey]]['TotalSales'];
             let patientsSorted = getPatientsSorted(data);
             await drawTable(patientsSorted);
-            await drawBanner();
+            await drawBanner(totalSales);
             document.getElementById('footer').classList.remove('d-none');
 
             // function definitions -- helper functions
@@ -94,13 +95,15 @@ document.addEventListener("DOMContentLoaded", function(e) {
                 })
                 return patientObjectsSorted;
             }
-            async function drawBanner() {
+            async function drawBanner(totalSales) {
                 let facilityDiv = document.getElementById('facility');
                 let facility = facilityID[facilityIDKey]
                 if ((await chrome.storage.local.get('facilityIDToNameMap')).hasOwnProperty('facilityIDToNameMap')) {
                     facility = (await chrome.storage.local.get('facilityIDToNameMap')).facilityIDToNameMap[facilityID[facilityIDKey]] ?? facility;
                 }
                 facilityDiv.innerHTML += " " + facility;
+                let totalSalesDiv = document.getElementById('sales');
+                totalSalesDiv.innerHTML += " " + totalSales;
                 let healthStatus = await chrome.storage.local.get(['healthStatus']);
                 let banner = document.getElementById('banner');
                 let mjp = document.getElementById('MJP-status');
