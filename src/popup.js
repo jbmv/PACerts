@@ -103,7 +103,7 @@ document.addEventListener("DOMContentLoaded", function(e) {
                 }
                 facilityDiv.innerHTML += " " + facility;
                 let totalSalesDiv = document.getElementById('sales');
-                totalSalesDiv.innerHTML += " " + totalSales;
+                totalSalesDiv.innerHTML += " " + totalSales.toFixed(2);
                 let healthStatus = await chrome.storage.local.get(['healthStatus']);
                 let banner = document.getElementById('banner');
                 let mjp = document.getElementById('MJP-status');
