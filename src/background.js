@@ -232,7 +232,7 @@ async function activate() {
       function processMJTransactionReport(transactionReport) {
         console.log(transactionReport);
         let missedPatients = [];
-        if (transactionReport.transactions[0].orderDate === today) {
+        if (transactionReport.transactions[Object.keys(transactionReport.transactions)[0]].orderDate === today) {
           // if the report is for today set totalSales to 0 in preparation to recalculate it from the report
           totalSales = 0.0;
         }
