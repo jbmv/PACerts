@@ -36,6 +36,7 @@ async function activate() {
   let today = date.getFullYear() + '-' + String((date.getMonth() + 1)).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
   let patients = {};
   let patientLists = {};
+  let totalTransactions = 0;
   let totalSales = 0.0;
   let lastHeartbeats = {};
   let healthStatus = {
@@ -235,10 +236,12 @@ async function activate() {
         if (transactionReport.transactions[Object.keys(transactionReport.transactions)[0]].orderDate === today) {
           // if the report is for today set totalSales to 0 in preparation to recalculate it from the report
           totalSales = 0.0;
+          totalTransactions = 0;
         }
         Object.keys(transactionReport.transactions).forEach(key => {
           if (transactionReport.transactions[key].orderDate === today) {
             totalSales += parseFloat(transactionReport.transactions[key].orderTotal, 10);
+            totalTransactions += 1;
             if (!patientLists['seenToday'].includes(key)) {
               missedPatients.push(key);
             }
@@ -455,7 +458,7 @@ async function activate() {
       if (!facilityID || facilityID === '') {
         return;
       }
-      chrome.storage.local.set({[facilityID]: {'Patients': patients, 'PatientLists': patientLists, 'TotalSales': totalSales}});
+      chrome.storage.local.set({[facilityID]: {'Patients': patients, 'PatientLists': patientLists, 'TotalSales': totalSales, 'TotalTransactions': totalTransactions}});
       //update badge counter any time chrome.storage.local changes
       updateBadgeCounter();
 
