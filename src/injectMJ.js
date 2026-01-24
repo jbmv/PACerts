@@ -6,6 +6,8 @@
 //     console.log(message);
 // })
 const extensionID = "kpcedepijhpepjapebgcpkkpkklkejkp";
+// replace window.alert with empty function because MJ now gives an alert to close tabs if more than 2 are open -- this prevents this from happening
+window.alert = function () {};
 (function(xhr) {
     var XHR = XMLHttpRequest.prototype;
     var open = XHR.open;

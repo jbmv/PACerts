@@ -2,8 +2,6 @@ const isIncognitoMode = chrome.extension.inIncognitoContext;
 const facilityIDKey = isIncognitoMode ? 'facilityID-incognito' : 'facilityID';
 const stateKey = isIncognitoMode ? 'state-incognito' : 'state';
 let currentUrl = window.location.href;
-// replace window.alert with empty function because MJ now gives an alert to close tabs if more than 2 are open -- this prevents this from happening
-window.alert = function () {};
 chrome.storage.local.get(stateKey).then(state => {
     if (state['state'] !== 'await activation') {
         // Inject script into MJ page to extend xhttp requests so we can grab response data for processing
