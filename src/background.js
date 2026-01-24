@@ -398,7 +398,7 @@ async function activate() {
         } else {
           patients[dohConsumerID]['certData'] = certData;
           patientLists['problems'].push(dohConsumerID);
-          if (options.sound) {
+          if (options.sound || options.autoCert) {
             await createOffscreenDocument();
             await chrome.runtime.sendMessage({type: 'play-sound', sound: 'problemcert.wav'}, response => {
               if (chrome.runtime.lastError) {
